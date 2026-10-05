@@ -57,6 +57,7 @@ swift_library(
 ios_unit_test(
     name = "CharactersTests",
     minimum_os_version = "18.0",
+    runner = "//tools:ios_test_runner",
     visibility = ["//visibility:public"],
     deps = [":CharactersTestsLib"],
 )

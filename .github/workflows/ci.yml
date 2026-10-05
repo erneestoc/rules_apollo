@@ -41,8 +41,10 @@ jobs:
         with:
           bazelisk-cache: true
           repository-cache: true
-      # Codegen, the iOS app, and the feature tests on the simulator.
-      - run: bazel test //... --test_output=errors
+      # Codegen, the iOS app, and the feature tests on the simulator. The test
+      # bundles share one simulator; run them one at a time so a cold runner
+      # creates and boots it once (the first boot can take several minutes).
+      - run: bazel test //... --test_output=errors --local_test_jobs=1 --test_timeout=900
         working-directory: examples/rick_and_morty
       # The Xcode project generates and builds through Bazel.
       - run: |
