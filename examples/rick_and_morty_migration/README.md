@@ -50,8 +50,8 @@ The generated project has a scheme for every module of both runtimes (`ApolloAPI
 
 - In `Features/Episodes/Sources/EpisodesScreen.swift`, jump to definition on `EpisodesQuery`
   (`EpisodesGraphQL`, home runtime 2.4.0), on `CharacterCard` (`CharactersGraphQL_v2`) and on
-  `.some(…)` (`GraphQLNullable` in `ApolloAPI_v2`, through the only alias). All three should land in
-  the 2.4.0 sources.
+  `.some(…)` (`GraphQLNullable` in `ApolloAPI_v2`, through the only alias). All three land in the
+  2.4.0 sources (verified with Xcode 26.2).
 - In `Features/Characters/Sources/CharactersScreen.swift` the same symbols should land in 1.15.2.
 - Autocomplete and inline errors in both files.
 - Breakpoints in both features while the app runs.

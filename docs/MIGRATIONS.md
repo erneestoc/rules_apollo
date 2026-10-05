@@ -158,9 +158,9 @@ When every module is on `next`:
 
 An earlier design aliased every module (so `import EpisodesGraphQL` reached `EpisodesGraphQL_v2`). Xcode
 couldn't jump to types in generated modules reached that way, which is why only Apollo iOS is aliased now.
-Verified so far: jump to definition on `GraphQLNullable` through the Apollo iOS alias, and on generated
-types in unaliased modules. To check in the example: `CharacterCard` in `EpisodesScreen.swift`, which comes
-from `CharactersGraphQL_v2`.
+Verified in Xcode 26.2 with rules_xcodeproj 4.1, in `EpisodesScreen.swift` (2.4.0): jump to definition on
+`EpisodesQuery` (`EpisodesGraphQL`), on `CharacterCard` (`CharactersGraphQL_v2`) and on `GraphQLNullable`
+(`ApolloAPI_v2`, through the alias) all land in the 2.4.0 sources.
 
 ## Verified
 
