@@ -1,0 +1,40 @@
+load("@build_bazel_rules_swift//swift:swift_test.bzl", "swift_test")
+load("@rules_apollo//apollo:swift.bzl", "apollo_swift_operations", "apollo_swift_test_mocks")
+
+filegroup(
+    name = "graphql",
+    srcs = glob(["*.graphql"]),
+    visibility = ["//graphql:__pkg__"],
+)
+
+apollo_swift_operations(
+    name = "AnimalsGraphQL",
+    srcs = [":graphql"],
+    apollo_api = "@apollo_ios//:ApolloAPI",
+    schema = "//graphql:AnimalKingdomAPI",
+    visibility = ["//visibility:public"],
+    # AllAnimalsQuery spreads PetDetails, which PetsGraphQL owns.
+    deps = ["//Features/Pets:PetsGraphQL"],
+)
+
+apollo_swift_test_mocks(
+    name = "AnimalsTestSupport",
+    apollo_api = "@apollo_ios//:ApolloAPI",
+    apollo_test_support = "@apollo_ios//:ApolloTestSupport",
+    base = "//graphql:AnimalKingdomAPIMocks",
+    operations = [":AnimalsGraphQL"],
+    schema = "//graphql:AnimalKingdomAPI",
+    visibility = ["//visibility:public"],
+)
+
+swift_test(
+    name = "AnimalsMocksTests",
+    srcs = glob(["Tests/*.swift"]),
+    deps = [
+        ":AnimalsGraphQL",
+        ":AnimalsTestSupport",
+        "//Features/Pets:PetsTestSupport",
+        "//graphql:AnimalKingdomAPIMocks",
+        "@apollo_ios//:ApolloTestSupport",
+    ],
+)

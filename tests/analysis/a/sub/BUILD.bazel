@@ -1,0 +1,9 @@
+load("//apollo:defs.bzl", "apollo_operations")
+
+apollo_operations(
+    name = "sub",
+    srcs = ["Sub.graphql"],
+    schema = "//tests/analysis:schema",
+    tags = ["manual"],
+    visibility = ["//tests/analysis:__subpackages__"],
+)

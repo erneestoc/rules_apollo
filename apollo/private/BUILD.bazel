@@ -1,0 +1,32 @@
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+
+# Exec-platform settings used by the `@<name>//:cli` aliases from the extension.
+[
+    config_setting(
+        name = triple,
+        constraint_values = constraints,
+        visibility = ["//visibility:public"],
+    )
+    for triple, constraints in {
+        "aarch64-apple-darwin": [
+            "@platforms//os:macos",
+            "@platforms//cpu:aarch64",
+        ],
+        "aarch64-unknown-linux-gnu": [
+            "@platforms//os:linux",
+            "@platforms//cpu:aarch64",
+        ],
+        "x86_64-unknown-linux-gnu": [
+            "@platforms//os:linux",
+            "@platforms//cpu:x86_64",
+        ],
+    }.items()
+]
+
+bzl_library(
+    name = "rules",
+    srcs = glob(["*.bzl"]),
+    visibility = ["//apollo:__subpackages__"],
+)
+
+exports_files(["mock_partition.sh"])

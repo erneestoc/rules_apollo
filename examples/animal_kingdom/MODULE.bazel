@@ -1,0 +1,25 @@
+module(name = "animal_kingdom_example")
+
+bazel_dep(name = "rules_apollo")
+local_path_override(
+    module_name = "rules_apollo",
+    path = "../..",
+)
+
+bazel_dep(name = "apple_support", version = "2.7.0", repo_name = "build_bazel_apple_support")
+bazel_dep(name = "rules_swift", version = "3.6.1", repo_name = "build_bazel_rules_swift")
+bazel_dep(name = "rules_shell", version = "0.6.1")
+
+apollo = use_extension("@rules_apollo//apollo:extensions.bzl", "apollo")
+apollo.toolchain(version = "2.4.0")
+
+# The Apollo iOS runtime must match the codegen version.
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "apollo_ios",
+    build_file = "//third_party:apollo_ios.BUILD",
+    sha256 = "e2a40c95627d34343d794aaa59a6a5760c53ed8cd5915196ae4d65f863255e70",
+    strip_prefix = "apollo-ios-2.4.0",
+    urls = ["https://github.com/apollographql/apollo-ios/archive/refs/tags/2.4.0.tar.gz"],
+)

@@ -1,0 +1,13 @@
+load("//apollo:defs.bzl", "apollo_operations")
+
+exports_files(glob(["*.graphql"]))
+
+# Depends on a target in a subpackage. Exact --bazel-generate-for selection means
+# the dep's files, though under this package's directory, are not generated here.
+apollo_operations(
+    name = "nested_dep",
+    srcs = ["A.graphql"],
+    schema = "//tests/analysis:schema",
+    visibility = ["//tests/analysis:__pkg__"],
+    deps = ["//tests/analysis/a/sub"],
+)

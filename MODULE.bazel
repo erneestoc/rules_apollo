@@ -1,0 +1,30 @@
+module(
+    name = "rules_apollo",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "bazel_skylib", version = "1.9.0")
+
+# Used by apollo_mock_partition_update to rewrite BUILD files.
+bazel_dep(name = "buildozer", version = "10.1.0")
+
+# Only needed by //apollo:swift.bzl. Kept as a regular dep so the macros work
+# out of the box; the core rules do not load rules_swift.
+bazel_dep(name = "rules_swift", version = "3.6.1", repo_name = "build_bazel_rules_swift")
+
+apollo = use_extension("//apollo:extensions.bzl", "apollo")
+
+# Default when the root module declares no toolchain.
+apollo.toolchain(version = "2.4.0")
+use_repo(apollo, "apollo_toolchains")
+
+register_toolchains("@apollo_toolchains//:all")
+
+# Tests: a second, unregistered CLI version used through apollo_schema(cli = ...).
+apollo_dev = use_extension("//apollo:extensions.bzl", "apollo", dev_dependency = True)
+apollo_dev.toolchain(
+    name = "apollo_cli_2_3_0",
+    version = "2.3.0",
+)
+use_repo(apollo_dev, "apollo_cli_2_3_0")

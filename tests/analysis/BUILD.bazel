@@ -1,0 +1,177 @@
+load("//apollo:defs.bzl", "apollo_operations", "apollo_schema", "apollo_test_mocks", "apollo_toolchain")
+load(":analysis_tests.bzl", "failure_test", "mocks_action_test", "operations_action_test", "schema_action_test")
+
+apollo_schema(
+    name = "schema",
+    srcs = [
+        "//tests/analysis/a:A.graphql",
+        "//tests/analysis/other:Other.graphql",
+    ],
+    options = json.encode({"schemaDocumentation": "include"}),
+    schema = ["schema.graphqls"],
+    schema_namespace = "TestAPI",
+    visibility = ["//tests:__subpackages__"],
+)
+
+# A stand-in CLI that claims to be an old release, for version gating.
+apollo_toolchain(
+    name = "cli_1_15_1",
+    cli = "fake_cli.sh",
+    version = "1.15.1",
+)
+
+apollo_schema(
+    name = "old_cli_new_option",
+    srcs = ["Second.graphql"],
+    cli = ":cli_1_15_1",
+    options = json.encode({"markTypesNonisolated": False}),
+    schema = ["schema.graphqls"],
+    tags = ["manual"],
+)
+
+apollo_schema(
+    name = "rule_owned_option",
+    srcs = ["Second.graphql"],
+    options = json.encode({"pruneGeneratedFiles": True}),
+    schema = ["schema.graphqls"],
+    tags = ["manual"],
+)
+
+apollo_schema(
+    name = "second_schema",
+    srcs = ["Second.graphql"],
+    schema = ["schema.graphqls"],
+)
+
+apollo_operations(
+    name = "ops_on_second_schema",
+    srcs = ["Second.graphql"],
+    schema = ":second_schema",
+    visibility = ["//tests/analysis:__subpackages__"],
+)
+
+schema_action_test(
+    name = "schema_action_test",
+    target_under_test = ":schema",
+)
+
+operations_action_test(
+    name = "operations_action_test",
+    generated = ["tests/analysis/other/Other.graphql"],
+    inputs = [
+        "tests/analysis/a/sub/Sub.graphql",
+        "tests/analysis/other/Other.graphql",
+    ],
+    target_under_test = "//tests/analysis/other",
+)
+
+operations_action_test(
+    name = "nested_dep_test",
+    generated = ["tests/analysis/a/A.graphql"],
+    inputs = [
+        "tests/analysis/a/A.graphql",
+        "tests/analysis/a/sub/Sub.graphql",
+    ],
+    target_under_test = "//tests/analysis/a:nested_dep",
+)
+
+failure_test(
+    name = "version_gated_option_test",
+    expected = "requires Apollo iOS >= 2.1.0",
+    target_under_test = ":old_cli_new_option",
+)
+
+failure_test(
+    name = "rule_owned_option_test",
+    expected = "is managed by rules_apollo",
+    target_under_test = ":rule_owned_option",
+)
+
+failure_test(
+    name = "schema_mismatch_test",
+    expected = "can only use fragments from the same schema",
+    target_under_test = "//tests/analysis/other:other_schema_dep",
+)
+
+# Real codegen with a per-schema CLI override; its operations inherit that CLI.
+apollo_schema(
+    name = "pinned_schema",
+    srcs = ["Second.graphql"],
+    cli = "@apollo_cli_2_3_0//:cli",
+    schema = ["schema.graphqls"],
+    visibility = ["//tests:__subpackages__"],
+)
+
+# Test mocks: a base and a feature of //tests/analysis:schema.
+apollo_test_mocks(
+    name = "base_mocks",
+    exclude_types = ["Cat"],
+    schema = ":schema",
+    types = ["Dog"],
+)
+
+apollo_test_mocks(
+    name = "feature_mocks",
+    base = ":base_mocks",
+    module_name = "OtherMocks",
+    operations = ["//tests/analysis/other"],
+    schema = ":schema",
+)
+
+mocks_action_test(
+    name = "base_mocks_action_test",
+    # `types` is declarative for the base; only exclude_types reaches the CLI.
+    excluded = ["Cat"],
+    target_under_test = ":base_mocks",
+)
+
+mocks_action_test(
+    name = "feature_mocks_action_test",
+    base_module = ["base_mocks"],
+    excluded = ["Dog"],
+    generate_for = ["tests/analysis/other/Other.graphql"],
+    scope = ["referenced"],
+    target_under_test = ":feature_mocks",
+)
+
+apollo_test_mocks(
+    name = "feature_without_scope",
+    base = ":base_mocks",
+    schema = ":schema",
+    tags = ["manual"],
+)
+
+apollo_test_mocks(
+    name = "feature_with_exclude_types",
+    base = ":base_mocks",
+    exclude_types = ["Dog"],
+    operations = ["//tests/analysis/other"],
+    schema = ":schema",
+    tags = ["manual"],
+)
+
+apollo_test_mocks(
+    name = "feature_scope_outside_schema",
+    srcs = ["Second.graphql"],
+    base = ":base_mocks",
+    schema = ":schema",
+    tags = ["manual"],
+)
+
+failure_test(
+    name = "feature_without_scope_test",
+    expected = "needs `operations` or `srcs` to define its scope",
+    target_under_test = ":feature_without_scope",
+)
+
+failure_test(
+    name = "feature_with_exclude_types_test",
+    expected = "`exclude_types` is only for the base",
+    target_under_test = ":feature_with_exclude_types",
+)
+
+failure_test(
+    name = "feature_scope_outside_schema_test",
+    expected = "are not in the srcs of",
+    target_under_test = ":feature_scope_outside_schema",
+)

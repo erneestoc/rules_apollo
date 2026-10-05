@@ -1,0 +1,7 @@
+load("//apollo:defs.bzl", "apollo_operations")
+
+apollo_operations(
+    name = "pinned",
+    srcs = ["Pinned.graphql"],
+    schema = "//tests/analysis:pinned_schema",
+)

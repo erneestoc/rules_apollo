@@ -1,0 +1,36 @@
+load("@build_bazel_rules_swift//swift:swift_test.bzl", "swift_test")
+load("@rules_apollo//apollo:swift.bzl", "apollo_swift_operations", "apollo_swift_test_mocks")
+
+filegroup(
+    name = "graphql",
+    srcs = glob(["*.graphql"]),
+    visibility = ["//graphql:__pkg__"],
+)
+
+apollo_swift_operations(
+    name = "PetsGraphQL",
+    srcs = [":graphql"],
+    apollo_api = "@apollo_ios//:ApolloAPI",
+    schema = "//graphql:AnimalKingdomAPI",
+    visibility = ["//visibility:public"],
+)
+
+apollo_swift_test_mocks(
+    name = "PetsTestSupport",
+    apollo_api = "@apollo_ios//:ApolloAPI",
+    apollo_test_support = "@apollo_ios//:ApolloTestSupport",
+    base = "//graphql:AnimalKingdomAPIMocks",
+    operations = [":PetsGraphQL"],
+    schema = "//graphql:AnimalKingdomAPI",
+    visibility = ["//visibility:public"],
+)
+
+swift_test(
+    name = "PetsMocksTests",
+    srcs = glob(["Tests/*.swift"]),
+    deps = [
+        ":PetsTestSupport",
+        "//graphql:AnimalKingdomAPIMocks",
+        "@apollo_ios//:ApolloTestSupport",
+    ],
+)

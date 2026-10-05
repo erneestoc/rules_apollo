@@ -1,0 +1,56 @@
+load("@rules_apollo//apollo:swift.bzl", "apollo_swift_mock_partition", "apollo_swift_schema", "apollo_swift_test_mocks")
+
+# The base module. It sees every .graphql file because Apollo only generates the
+# schema types that some operation references.
+apollo_swift_schema(
+    name = "AnimalKingdomAPI",
+    srcs = [
+        "//Features/Animals:graphql",
+        "//Features/Pets:graphql",
+    ],
+    apollo_api = "@apollo_ios//:ApolloAPI",
+    custom_scalars = ["CustomDate"],
+    operation_manifest_version = "persistedQueries",
+    options = {
+        "operationDocumentFormat": [
+            "definition",
+            "operationId",
+        ],
+        "schemaDocumentation": "include",
+    },
+    schema = ["AnimalSchema.graphqls"],
+    swift_srcs = ["CustomDate.swift"],
+    visibility = ["//visibility:public"],
+)
+
+# Mocks shared by several features, plus the MockObject typealiases. The type
+# lists are maintained by `bazel run //graphql:mock_partition_test_update`.
+apollo_swift_test_mocks(
+    name = "AnimalKingdomAPIMocks",
+    apollo_api = "@apollo_ios//:ApolloAPI",
+    apollo_test_support = "@apollo_ios//:ApolloTestSupport",
+    exclude_types = ["Mutation"],
+    schema = ":AnimalKingdomAPI",
+    types = [
+        "Bird",
+        "Cat",
+        "Crocodile",
+        "Dog",
+        "Fish",
+        "Height",
+        "Human",
+        "PetRock",
+        "Query",
+        "Rat",
+    ],
+    visibility = ["//Features:__subpackages__"],
+)
+
+apollo_swift_mock_partition(
+    name = "mock_partition_test",
+    base = ":AnimalKingdomAPIMocks",
+    feature_mocks = [
+        "//Features/Animals:AnimalsTestSupport",
+        "//Features/Pets:PetsTestSupport",
+    ],
+)

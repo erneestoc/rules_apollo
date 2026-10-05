@@ -1,0 +1,8 @@
+common --enable_bzlmod
+common --lockfile_mode=off
+
+# Codegen runs as a persistent worker; the worker keeps the parsed schema warm
+# across actions. See docs/DESIGN.md#persistent-workers.
+build --strategy=ApolloCodegen=worker,sandboxed
+
+try-import %workspace%/user.bazelrc
