@@ -60,8 +60,34 @@ apollo_swift_library(
 `runtimes = ["current", "next"]`. Use `#if APOLLO_IOS_2` / `#else` where the APIs differ; the example's
 `Networking/Network.swift` wraps the 1.x callback API and the 2.x async API behind one function.
 
-**Other Swift rules:** `apollo_runtime_copts(runtime, runtime_deps)` gives you the flags, for rules that
-aren't `apollo_swift_library`.
+**Using the rules directly:** the codegen targets output plain `.swift` files, which you can compile with
+any Swift rule. `apollo_runtime("next")` returns the runtime's `cli`, `apollo_api`, `apollo` and
+`apollo_test_support` labels. `apollo_runtime_copts("next", runtime_deps, modules)` returns the alias flags.
+In the example, `Features/Episodes` works this way:
+
+```starlark
+NEXT = apollo_runtime("next")
+
+apollo_operations(
+    name = "EpisodesGraphQL_codegen",
+    srcs = [":graphql"],
+    module_name = "EpisodesGraphQL",              # only exists on 2.4.0: no suffix needed
+    schema = "//graphql:RickAndMortyAPI_v2_apollo",
+    deps = ["//Features/Characters:CharactersGraphQL_v2_apollo"],
+)
+
+swift_library(
+    name = "EpisodesGraphQL",
+    srcs = [":EpisodesGraphQL_codegen"],
+    module_name = "EpisodesGraphQL",
+    copts = apollo_runtime_copts("next", modules = ["RickAndMortyAPI"]),
+    deps = ["//graphql:RickAndMortyAPI_v2", "//Features/Characters:CharactersGraphQL_v2", NEXT.apollo_api],
+)
+```
+
+Only modules that exist on both runtimes need a suffix and an alias: Apollo iOS itself, the schema module,
+and fragment owners used across the boundary. A module that only ever exists on one runtime can keep its
+plain name.
 
 ## The one rule: no Apollo types across runtimes
 
@@ -114,6 +140,19 @@ When every module is on `next`:
 
 Source files don't change: they always said `import ApolloAPI`. Module names lose the `_v2` suffix,
 because the remaining runtime has none.
+
+## Known issue: Xcode jump to definition in aliased generated modules
+
+In the rules_xcodeproj project, ⌘-click on `EpisodesQuery` in `EpisodesScreen.swift` showed "Couldn't
+Generate Swift Representation: Could not load module: EpisodesGraphQL". This was while that module was
+built as `EpisodesGraphQL_v2` and aliased. In the same file, `GraphQLNullable` (aliased `ApolloAPI_v2`) jumped
+correctly, and so did generated types in unaliased modules (`LocationsQuery`). Whether every aliased
+generated module behaves this way (e.g. `CharacterCard` from `CharactersGraphQL_v2`) is not verified yet.
+
+Bazel's index, Xcode's index and the compiler flags in the generated project all record the real module
+names consistently. The difference is inside Xcode's jump-to-definition, which reports aliased modules by
+their alias name. Until it's understood, keep modules that only exist on one runtime unsuffixed, like
+`EpisodesGraphQL` in the example.
 
 ## Verified
 

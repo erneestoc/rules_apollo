@@ -79,18 +79,38 @@ def _require(value, what, rt):
         fail("`%s` is required when no apollo.runtime() is declared." % what)
     return value
 
+def apollo_runtime(name):
+    """Looks up a declared runtime, for BUILD files that use the rules directly.
+
+    Args:
+        name: name of an apollo.runtime().
+
+    Returns:
+        struct with `version`, `suffix`, and labels `cli`, `apollo_api`, `apollo`,
+        `apollo_test_support`.
+    """
+    return _runtime(name)
+
 # buildifier: disable=unnamed-macro
-def apollo_runtime_copts(runtime, runtime_deps = []):
+def apollo_runtime_copts(runtime, runtime_deps = [], modules = []):
     """Swift copts for a target of your own on `runtime`, for rules other than apollo_swift_library.
 
     Args:
         runtime: name of an apollo.runtime().
-        runtime_deps: runtime-variant targets it imports (schema, operations, mocks, libraries).
+        runtime_deps: runtime-variant targets it imports (schema, operations, mocks, libraries),
+            aliased by their target names.
+        modules: other module names to alias to `<name><suffix>`, e.g. the schema namespace
+            when compiling generated code of your own.
 
     Returns:
         list of copts.
     """
-    return _copts(_runtime(runtime), runtime_deps)
+    rt = _runtime(runtime)
+    flags = _copts(rt, runtime_deps)
+    if rt.suffix:
+        for module in modules:
+            flags += ["-module-alias", "%s=%s%s" % (module, module, rt.suffix)]
+    return flags
 
 def apollo_swift_schema(
         name,

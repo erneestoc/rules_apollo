@@ -1,5 +1,7 @@
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_unit_test")
-load("@rules_apollo//apollo:swift.bzl", "apollo_swift_library", "apollo_swift_operations")
+load("@build_bazel_rules_swift//swift:swift_library.bzl", "swift_library")
+load("@rules_apollo//apollo:defs.bzl", "apollo_operations")
+load("@rules_apollo//apollo:swift.bzl", "apollo_runtime", "apollo_runtime_copts", "apollo_swift_library")
 
 filegroup(
     name = "graphql",
@@ -7,29 +9,52 @@ filegroup(
     visibility = ["//graphql:__pkg__"],
 )
 
-# Generated code, one variant per runtime (EpisodesGraphQL, EpisodesGraphQL_v2).
-apollo_swift_operations(
-    name = "EpisodesGraphQL",
+# This package uses the rules directly instead of apollo_swift_operations: the
+# codegen target's output (plain .swift files) goes into a swift_library of our
+# own. Characters and Locations use the macros; both styles mix in one app.
+#
+# Episodes' generated code only exists on the 2.4.0 runtime, so its module keeps
+# its plain name and needs no alias. Only what really exists on both runtimes
+# (Apollo iOS, the schema module, CharactersGraphQL) is suffixed and aliased.
+NEXT = apollo_runtime("next")
+
+apollo_operations(
+    name = "EpisodesGraphQL_codegen",
     srcs = [":graphql"],
-    schema = "//graphql:RickAndMortyAPI",
-    visibility = ["//visibility:public"],
-    # Spreads CharacterCard, owned by Characters. Each variant uses the matching
-    # Characters variant, so Characters needs no migration for this to work.
-    deps = ["//Features/Characters:CharactersGraphQL"],
+    module_name = "EpisodesGraphQL",
+    schema = "//graphql:RickAndMortyAPI_v2_apollo",
+    # Spreads CharacterCard: the 2.4.0 variant of the Characters fragments.
+    deps = ["//Features/Characters:CharactersGraphQL_v2_apollo"],
 )
 
-# The feature, on the "next" runtime. Migrating it is changing this one line
-# (here and on the tests below), plus any API changes the new version brings.
+swift_library(
+    name = "EpisodesGraphQL",
+    srcs = [":EpisodesGraphQL_codegen"],
+    # Generated code says `import ApolloAPI` and `RickAndMortyAPI.Objects...`.
+    copts = apollo_runtime_copts(
+        "next",
+        modules = ["RickAndMortyAPI"],
+    ),
+    module_name = "EpisodesGraphQL",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//Features/Characters:CharactersGraphQL_v2",
+        "//graphql:RickAndMortyAPI_v2",
+        NEXT.apollo_api,
+    ],
+)
+
+# The feature, on the "next" runtime (Apollo iOS 2.4.0).
 apollo_swift_library(
     name = "EpisodesFeature",
     srcs = glob(["Sources/*.swift"]),
     runtime = "next",
     visibility = ["//visibility:public"],
-    runtime_deps = [
+    runtime_deps = ["//Networking"],
+    deps = [
         ":EpisodesGraphQL",
-        "//Networking",
+        "//Features/CharacterUI",
     ],
-    deps = ["//Features/CharacterUI"],
 )
 
 apollo_swift_library(
@@ -42,11 +67,11 @@ apollo_swift_library(
     ],
     module_name = "EpisodesTests",
     runtime = "next",
-    runtime_deps = [
+    runtime_deps = ["//graphql:RickAndMortyAPIMocks"],
+    deps = [
+        ":EpisodesFeature",
         ":EpisodesGraphQL",
-        "//graphql:RickAndMortyAPIMocks",
     ],
-    deps = [":EpisodesFeature"],
 )
 
 ios_unit_test(
