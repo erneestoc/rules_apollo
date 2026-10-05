@@ -1,0 +1,6 @@
+common --enable_bzlmod
+common --lockfile_mode=off
+build --strategy=ApolloCodegen=worker,sandboxed
+
+# Simulator builds by default; the app is iOS-only.
+build --ios_multi_cpus=sim_arm64

@@ -17,7 +17,7 @@ apollo = use_extension("//apollo:extensions.bzl", "apollo")
 
 # Default when the root module declares no toolchain.
 apollo.toolchain(version = "2.4.0")
-use_repo(apollo, "apollo_toolchains")
+use_repo(apollo, "apollo_runtimes", "apollo_toolchains")
 
 register_toolchains("@apollo_toolchains//:all")
 

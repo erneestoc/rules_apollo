@@ -1,0 +1,16 @@
+query Locations($page: Int) {
+  locations(page: $page) {
+    info {
+      next
+    }
+    results {
+      id
+      name
+      type
+      dimension
+      residents {
+        ...CharacterCard
+      }
+    }
+  }
+}

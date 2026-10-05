@@ -1,0 +1,55 @@
+load("@build_bazel_rules_apple//apple:ios.bzl", "ios_unit_test")
+load("@rules_apollo//apollo:swift.bzl", "apollo_swift_library", "apollo_swift_operations")
+
+filegroup(
+    name = "graphql",
+    srcs = glob(["*.graphql"]),
+    visibility = ["//graphql:__pkg__"],
+)
+
+# Generated code, one variant per runtime (CharactersGraphQL, CharactersGraphQL_v2).
+apollo_swift_operations(
+    name = "CharactersGraphQL",
+    srcs = [":graphql"],
+    schema = "//graphql:RickAndMortyAPI",
+    visibility = ["//visibility:public"],
+)
+
+# The feature, on the "current" runtime. Migrating it is changing this one line
+# (here and on the tests below), plus any API changes the new version brings.
+apollo_swift_library(
+    name = "CharactersFeature",
+    srcs = glob(["Sources/*.swift"]),
+    runtime = "current",
+    visibility = ["//visibility:public"],
+    runtime_deps = [
+        ":CharactersGraphQL",
+        "//Networking",
+    ],
+    deps = ["//Features/CharacterUI"],
+)
+
+apollo_swift_library(
+    name = "CharactersTestsLib",
+    testonly = True,
+    srcs = glob(["Tests/*.swift"]),
+    apollo_deps = [
+        "ApolloAPI",
+        "ApolloTestSupport",
+    ],
+    module_name = "CharactersTests",
+    runtime = "current",
+    runtime_deps = [
+        ":CharactersGraphQL",
+        "//graphql:RickAndMortyAPIMocks",
+    ],
+    deps = [":CharactersFeature"],
+)
+
+ios_unit_test(
+    name = "CharactersTests",
+    minimum_os_version = "18.0",
+    runner = "//tools:ios_test_runner",
+    visibility = ["//visibility:public"],
+    deps = [":CharactersTestsLib"],
+)

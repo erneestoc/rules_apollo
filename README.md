@@ -10,6 +10,8 @@ Rust port of `apollo-ios-cli` in [erneestoc/apollo-ios-dev](https://github.com/e
 - **Hermetic inputs.** The CLI only sees the files Bazel declared: exact paths, never globs. Works sandboxed.
 - **Test mocks per feature.** A base mocks module plus one per feature, each type generated exactly once,
   with a test and a `bazel run` updater that keep the partition correct.
+- **Migrate one module at a time.** Two Apollo iOS versions can live in one app while it migrates;
+  each module picks its version ([docs/MIGRATIONS.md](docs/MIGRATIONS.md)).
 - **Any Apollo version.** Prebuilt CLIs for 34 releases from 1.15.1 to 2.4.0. You can pin a version
   repo-wide, or per schema while you migrate.
 - **Full configuration.** The `options` and `experimentalFeatures` keys from `apollo-codegen-config.json`
@@ -29,9 +31,11 @@ Prebuilt CLIs are available for `aarch64-apple-darwin`, `aarch64-linux` and `x86
 covers Apple Silicon and Linux remote execution. Intel Macs need a CLI built from source and
 registered with `apollo_toolchain`.
 
-Two complete examples:
+Three complete examples:
 - [`examples/rick_and_morty`](examples/rick_and_morty): a modular SwiftUI app for the public Rick and Morty
   API, with rules_apple, rules_xcodeproj, per-feature modules and mocks, and simulator tests.
+- [`examples/rick_and_morty_migration`](examples/rick_and_morty_migration): the same app halfway through a
+  migration, with Apollo iOS 1.15.2 and 2.4.0 in one binary.
 - [`examples/animal_kingdom`](examples/animal_kingdom): a smaller macOS fixture used for CI and the version
   matrix.
 
@@ -145,6 +149,21 @@ apollo_swift_schema(name = "MyAPI", cli = "@apollo_next//:cli", ...)
 
 Operations always use their schema's version. A mismatch with the registered toolchain is an analysis
 error.
+
+### Two Apollo versions while migrating
+
+```starlark
+# MODULE.bazel
+apollo.runtime(name = "current", version = "1.15.2")
+apollo.runtime(name = "next", version = "2.4.0", module_suffix = "_v2")
+
+# A feature's BUILD file
+apollo_swift_library(name = "EpisodesFeature", runtime = "next", runtime_deps = [":EpisodesGraphQL"], ...)
+```
+
+rules_apollo builds both Apollo iOS versions, generates code for each, and compiles each module against
+its runtime with Swift module aliases. Code keeps saying `import ApolloAPI`. See
+[docs/MIGRATIONS.md](docs/MIGRATIONS.md) for the setup and the one rule to follow.
 
 ### Workers
 

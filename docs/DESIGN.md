@@ -66,6 +66,9 @@ What actually constrains versioning is the runtime. Generated code must match th
 against, and an app binary links one `ApolloAPI`. So in practice the version moves per app. In a monorepo with
 several apps, each app's schema can move separately with the `cli` override.
 
+Within one app, runtimes go further: two Apollo iOS versions linked side by side, with each module on
+one of them, so a large app can migrate module by module. See [MIGRATIONS.md](MIGRATIONS.md).
+
 ## Discovery: splitting the schema module
 
 ### What actually invalidates what (measured)

@@ -1,0 +1,17 @@
+load("@rules_apollo//apollo:swift.bzl", "apollo_swift_library")
+
+# Shared by modules on both runtimes: built once per runtime, as Networking (1.15.2)
+# and Networking_v2 (2.4.0). Code on either runtime writes `import Networking`.
+apollo_swift_library(
+    name = "Networking",
+    srcs = ["Network.swift"],
+    apollo_deps = [
+        "Apollo",
+        "ApolloAPI",
+    ],
+    runtimes = [
+        "current",
+        "next",
+    ],
+    visibility = ["//visibility:public"],
+)

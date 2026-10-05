@@ -3,3 +3,4 @@
 MODULE.bazel.lock
 .DS_Store
 /examples/rick_and_morty/RickAndMorty.xcodeproj
+/examples/rick_and_morty_migration/RickAndMortyMigration.xcodeproj

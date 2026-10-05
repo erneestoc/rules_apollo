@@ -1,0 +1,10 @@
+load("@build_bazel_rules_swift//swift:swift_library.bzl", "swift_library")
+
+# Not on any Apollo runtime: plain models and views. Features on different runtimes
+# share UI through modules like this, never through generated or Apollo types.
+swift_library(
+    name = "CharacterUI",
+    srcs = glob(["*.swift"]),
+    module_name = "CharacterUI",
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,23 @@
+load("@build_bazel_rules_apple//apple:ios.bzl", "ios_ui_test")
+load("@build_bazel_rules_swift//swift:swift_library.bzl", "swift_library")
+
+swift_library(
+    name = "UITestsLib",
+    testonly = True,
+    srcs = glob(["*.swift"]),
+    module_name = "UITests",
+)
+
+# Drives the real app against the live API, so it is not part of `bazel test //...`:
+#   bazel test //UITests
+ios_ui_test(
+    name = "UITests",
+    minimum_os_version = "18.0",
+    runner = "//tools:ios_test_runner",
+    tags = [
+        "manual",
+        "requires-network",
+    ],
+    test_host = "//App:RickAndMorty",
+    deps = [":UITestsLib"],
+)

@@ -1,0 +1,26 @@
+module(name = "rick_and_morty_migration_example")
+
+bazel_dep(name = "rules_apollo")
+local_path_override(
+    module_name = "rules_apollo",
+    path = "../..",
+)
+
+bazel_dep(name = "apple_support", version = "2.9.1", repo_name = "build_bazel_apple_support")
+bazel_dep(name = "rules_apple", version = "5.2.0", repo_name = "build_bazel_rules_apple")
+bazel_dep(name = "rules_swift", version = "3.6.1", repo_name = "build_bazel_rules_swift")
+bazel_dep(name = "rules_xcodeproj", version = "4.1.0")
+
+# Two Apollo iOS versions in one app while it migrates. rules_apollo downloads each
+# version's CLI and builds its Apollo iOS libraries; "next" gets suffixed module
+# names (ApolloAPI_v2, RickAndMortyAPI_v2, ...) so both can be linked together.
+apollo = use_extension("@rules_apollo//apollo:extensions.bzl", "apollo")
+apollo.runtime(
+    name = "current",
+    version = "1.15.2",
+)
+apollo.runtime(
+    name = "next",
+    module_suffix = "_v2",
+    version = "2.4.0",
+)

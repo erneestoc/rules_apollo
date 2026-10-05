@@ -1,0 +1,58 @@
+load("@build_bazel_rules_apple//apple:ios.bzl", "ios_unit_test")
+load("@rules_apollo//apollo:swift.bzl", "apollo_swift_library", "apollo_swift_operations")
+
+filegroup(
+    name = "graphql",
+    srcs = glob(["*.graphql"]),
+    visibility = ["//graphql:__pkg__"],
+)
+
+# Generated code, one variant per runtime (EpisodesGraphQL, EpisodesGraphQL_v2).
+apollo_swift_operations(
+    name = "EpisodesGraphQL",
+    srcs = [":graphql"],
+    schema = "//graphql:RickAndMortyAPI",
+    visibility = ["//visibility:public"],
+    # Spreads CharacterCard, owned by Characters. Each variant uses the matching
+    # Characters variant, so Characters needs no migration for this to work.
+    deps = ["//Features/Characters:CharactersGraphQL"],
+)
+
+# The feature, on the "next" runtime. Migrating it is changing this one line
+# (here and on the tests below), plus any API changes the new version brings.
+apollo_swift_library(
+    name = "EpisodesFeature",
+    srcs = glob(["Sources/*.swift"]),
+    runtime = "next",
+    visibility = ["//visibility:public"],
+    runtime_deps = [
+        ":EpisodesGraphQL",
+        "//Networking",
+    ],
+    deps = ["//Features/CharacterUI"],
+)
+
+apollo_swift_library(
+    name = "EpisodesTestsLib",
+    testonly = True,
+    srcs = glob(["Tests/*.swift"]),
+    apollo_deps = [
+        "ApolloAPI",
+        "ApolloTestSupport",
+    ],
+    module_name = "EpisodesTests",
+    runtime = "next",
+    runtime_deps = [
+        ":EpisodesGraphQL",
+        "//graphql:RickAndMortyAPIMocks",
+    ],
+    deps = [":EpisodesFeature"],
+)
+
+ios_unit_test(
+    name = "EpisodesTests",
+    minimum_os_version = "18.0",
+    runner = "//tools:ios_test_runner",
+    visibility = ["//visibility:public"],
+    deps = [":EpisodesTestsLib"],
+)

@@ -52,3 +52,20 @@ jobs:
           xcodebuild -project RickAndMorty.xcodeproj -scheme RickAndMorty \
             -destination 'generic/platform=iOS Simulator' build
         working-directory: examples/rick_and_morty
+
+  rick_and_morty_migration:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bazel-contrib/setup-bazel@0.15.0
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+      # Apollo iOS 1.15.2 and 2.4.0 in one app: codegen, both runtimes, unit tests per runtime.
+      - run: bazel test //... --test_output=errors --local_test_jobs=1 --test_timeout=900
+        working-directory: examples/rick_and_morty_migration
+      - run: |
+          bazel run //:xcodeproj
+          xcodebuild -project RickAndMortyMigration.xcodeproj -scheme RickAndMorty \
+            -destination 'generic/platform=iOS Simulator' build
+        working-directory: examples/rick_and_morty_migration

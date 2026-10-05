@@ -1,0 +1,26 @@
+load("@build_bazel_rules_apple//apple:ios.bzl", "ios_application")
+load("@build_bazel_rules_swift//swift:swift_library.bzl", "swift_library")
+
+# The app is on no runtime: it composes features from both and only touches their
+# Apollo-free APIs (screens, CharacterUI).
+swift_library(
+    name = "AppLib",
+    srcs = glob(["*.swift"]),
+    module_name = "RickAndMortyApp",
+    deps = [
+        "//Features/CharacterUI",
+        "//Features/Characters:CharactersFeature",
+        "//Features/Episodes:EpisodesFeature",
+        "//Features/Locations:LocationsFeature",
+    ],
+)
+
+ios_application(
+    name = "RickAndMorty",
+    bundle_id = "io.github.erneestoc.rickandmorty.migration",
+    families = ["iphone"],
+    infoplists = ["Info.plist"],
+    minimum_os_version = "18.0",
+    visibility = ["//visibility:public"],
+    deps = [":AppLib"],
+)

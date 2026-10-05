@@ -1,0 +1,26 @@
+load("@rules_apollo//apollo:swift.bzl", "apollo_swift_schema", "apollo_swift_test_mocks")
+
+exports_files(["update_schema.sh"])
+
+# One schema, one base-types framework per runtime:
+#   RickAndMortyAPI     (Apollo iOS 1.15.2)
+#   RickAndMortyAPI_v2  (Apollo iOS 2.4.0)
+# Each is generated from every feature's operations, so either runtime can host any
+# feature without re-partitioning. Bazel builds only the variants something uses.
+apollo_swift_schema(
+    name = "RickAndMortyAPI",
+    srcs = [
+        "//Features/Characters:graphql",
+        "//Features/Episodes:graphql",
+        "//Features/Locations:graphql",
+    ],
+    schema = ["schema.graphqls"],
+    visibility = ["//visibility:public"],
+)
+
+# Test mocks, also one module per runtime (RickAndMortyAPIMocks, RickAndMortyAPIMocks_v2).
+apollo_swift_test_mocks(
+    name = "RickAndMortyAPIMocks",
+    schema = ":RickAndMortyAPI",
+    visibility = ["//visibility:public"],
+)
