@@ -2,3 +2,4 @@
 /examples/*/bazel-*
 MODULE.bazel.lock
 .DS_Store
+/examples/rick_and_morty/RickAndMorty.xcodeproj

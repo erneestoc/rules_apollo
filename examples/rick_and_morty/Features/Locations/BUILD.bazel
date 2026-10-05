@@ -1,0 +1,65 @@
+load("@build_bazel_rules_apple//apple:ios.bzl", "ios_unit_test")
+load("@build_bazel_rules_swift//swift:swift_library.bzl", "swift_library")
+load("@rules_apollo//apollo:swift.bzl", "apollo_swift_operations", "apollo_swift_test_mocks")
+
+filegroup(
+    name = "graphql",
+    srcs = glob(["*.graphql"]),
+    visibility = ["//graphql:__pkg__"],
+)
+
+# Swift module with only the generated operations and fragments.
+apollo_swift_operations(
+    name = "LocationsGraphQL",
+    srcs = [":graphql"],
+    apollo_api = "@apollo_ios//:ApolloAPI",
+    schema = "//graphql:RickAndMortyAPI",
+    visibility = ["//visibility:public"],
+    # Spreads the CharacterCard fragment owned by Characters.
+    deps = ["//Features/Characters:CharactersGraphQL"],
+)
+
+# The feature: SwiftUI screens and view models.
+swift_library(
+    name = "LocationsFeature",
+    srcs = glob(["Sources/*.swift"]),
+    module_name = "LocationsFeature",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":LocationsGraphQL",
+        "//Features/Characters:CharactersFeature",
+        "//Networking",
+    ],
+)
+
+# Mocks only this feature's operations reference.
+apollo_swift_test_mocks(
+    name = "LocationsTestSupport",
+    apollo_api = "@apollo_ios//:ApolloAPI",
+    apollo_test_support = "@apollo_ios//:ApolloTestSupport",
+    base = "//graphql:RickAndMortyAPIMocks",
+    operations = [":LocationsGraphQL"],
+    schema = "//graphql:RickAndMortyAPI",
+    visibility = ["//visibility:public"],
+)
+
+swift_library(
+    name = "LocationsTestsLib",
+    testonly = True,
+    srcs = glob(["Tests/*.swift"]),
+    module_name = "LocationsTests",
+    deps = [
+        ":LocationsFeature",
+        ":LocationsGraphQL",
+        ":LocationsTestSupport",
+        "//graphql:RickAndMortyAPIMocks",
+        "@apollo_ios//:ApolloTestSupport",
+    ],
+)
+
+ios_unit_test(
+    name = "LocationsTests",
+    minimum_os_version = "18.0",
+    visibility = ["//visibility:public"],
+    deps = [":LocationsTestsLib"],
+)

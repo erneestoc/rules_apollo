@@ -1,0 +1,47 @@
+load("@rules_apollo//apollo:swift.bzl", "apollo_swift_mock_partition", "apollo_swift_schema", "apollo_swift_test_mocks")
+
+# Fetched by introspection from https://rickandmortyapi.com/graphql.
+exports_files(["schema.graphqls"])
+
+# Schema types, generated from every feature's operations.
+apollo_swift_schema(
+    name = "RickAndMortyAPI",
+    srcs = [
+        "//Features/Characters:graphql",
+        "//Features/Episodes:graphql",
+        "//Features/Locations:graphql",
+    ],
+    apollo_api = "@apollo_ios//:ApolloAPI",
+    schema = ["schema.graphqls"],
+    visibility = ["//visibility:public"],
+)
+
+# Mocks shared by several features. The lists are maintained by
+# `bazel run //graphql:mock_partition_test_update`.
+apollo_swift_test_mocks(
+    name = "RickAndMortyAPIMocks",
+    apollo_api = "@apollo_ios//:ApolloAPI",
+    apollo_test_support = "@apollo_ios//:ApolloTestSupport",
+    schema = ":RickAndMortyAPI",
+    types = [
+        "Character",
+        "Characters",
+        "Episode",
+        "Episodes",
+        "Info",
+        "Location",
+        "Locations",
+        "Query",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+apollo_swift_mock_partition(
+    name = "mock_partition_test",
+    base = ":RickAndMortyAPIMocks",
+    feature_mocks = [
+        "//Features/Characters:CharactersTestSupport",
+        "//Features/Episodes:EpisodesTestSupport",
+        "//Features/Locations:LocationsTestSupport",
+    ],
+)

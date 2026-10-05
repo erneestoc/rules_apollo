@@ -1,0 +1,23 @@
+load("@build_bazel_rules_apple//apple:ios.bzl", "ios_application")
+load("@build_bazel_rules_swift//swift:swift_library.bzl", "swift_library")
+
+swift_library(
+    name = "AppLib",
+    srcs = glob(["*.swift"]),
+    module_name = "RickAndMortyApp",
+    deps = [
+        "//Features/Characters:CharactersFeature",
+        "//Features/Episodes:EpisodesFeature",
+        "//Features/Locations:LocationsFeature",
+    ],
+)
+
+ios_application(
+    name = "RickAndMorty",
+    bundle_id = "io.github.erneestoc.rickandmorty",
+    families = ["iphone"],
+    infoplists = ["Info.plist"],
+    minimum_os_version = "18.0",
+    visibility = ["//visibility:public"],
+    deps = [":AppLib"],
+)

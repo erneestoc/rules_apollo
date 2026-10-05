@@ -441,6 +441,20 @@ mode/selection's mocks byte-identical to the Swift CLI's, §2.5). All three pass
 * **Partition quality** depends on the schema: interface/union expansion pulls whole families into
   the base (§3.5). Expect the base to be large for "everything implements Node" schemas; the win is
   then mostly that features compile only their root/payload types and their tests link less.
+* **The shared root type collapses the partition (measured).** The closure rule (§3.6) has a strong
+  consequence. If two features run queries, `Query` is shared, so its mock lives in the base. Its fields
+  name the mock of every type a query returns, and those mocks name the next level, until every type
+  reachable from any selected `Query` field is in the base. A feature can only own types that are
+  reachable solely through a root it alone uses, e.g. the only feature with mutations owning `Mutation`
+  and its payloads (AnimalKingdom's `Mutation` in Pets). `examples/rick_and_morty`, with three features
+  that all query, ends with all 8 types in the base and empty feature `TestSupport` modules.
+
+  So per-feature mocks, as designed, mostly don't reduce what a feature's tests compile. The base still
+  works as the single shared mocks module. Making features own types needs the shared mocks to stop
+  naming them concretely. One option: generate root and shared mocks with fields typed by interface
+  (`Mock<some MockObject>`) rather than concrete mock classes, so a feature can supply its own types
+  without the base importing it. That is a CLI template change and a deeper design question. Until then,
+  the base module plus the partition test is the realistic setup.
 * **Ownership is declared** (`base.types`, `base.exclude_types`) because analysis cannot see
   `Ref(F)`. The updater and the partition test keep it honest. A future CLI mode that emits a
   JSON ownership manifest (per-file referenced sets) would let the updater avoid parsing file names.

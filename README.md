@@ -29,6 +29,12 @@ Prebuilt CLIs are available for `aarch64-apple-darwin`, `aarch64-linux` and `x86
 covers Apple Silicon and Linux remote execution. Intel Macs need a CLI built from source and
 registered with `apollo_toolchain`.
 
+Two complete examples:
+- [`examples/rick_and_morty`](examples/rick_and_morty): a modular SwiftUI app for the public Rick and Morty
+  API, with rules_apple, rules_xcodeproj, per-feature modules and mocks, and simulator tests.
+- [`examples/animal_kingdom`](examples/animal_kingdom): a smaller macOS fixture used for CI and the version
+  matrix.
+
 You also need the Apollo iOS runtime (`ApolloAPI`) as a Swift target, at the same version as the CLI. See
 [the example](examples/animal_kingdom/MODULE.bazel) for a ten-line `http_archive` setup.
 

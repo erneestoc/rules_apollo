@@ -1,0 +1,17 @@
+query CharacterDetail($id: ID!) {
+  character(id: $id) {
+    ...CharacterCard
+    gender
+    origin {
+      name
+    }
+    location {
+      name
+    }
+    episode {
+      id
+      name
+      episode
+    }
+  }
+}

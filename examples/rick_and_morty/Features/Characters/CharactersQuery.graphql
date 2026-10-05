@@ -1,0 +1,10 @@
+query Characters($page: Int, $name: String) {
+  characters(page: $page, filter: { name: $name }) {
+    info {
+      next
+    }
+    results {
+      ...CharacterCard
+    }
+  }
+}

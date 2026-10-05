@@ -32,3 +32,21 @@ jobs:
       # Generates, compiles and runs three Swift modules against ApolloAPI.
       - run: bazel test //...
         working-directory: examples/animal_kingdom
+
+  rick_and_morty:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bazel-contrib/setup-bazel@0.15.0
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+      # Codegen, the iOS app, and the feature tests on the simulator.
+      - run: bazel test //...
+        working-directory: examples/rick_and_morty
+      # The Xcode project generates and builds through Bazel.
+      - run: |
+          bazel run //:xcodeproj
+          xcodebuild -project RickAndMorty.xcodeproj -scheme RickAndMorty \
+            -destination 'generic/platform=iOS Simulator' build
+        working-directory: examples/rick_and_morty

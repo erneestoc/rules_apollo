@@ -1,0 +1,36 @@
+import ApolloTestSupport
+import EpisodesFeature
+import EpisodesGraphQL
+import RickAndMortyAPIMocks
+import XCTest
+
+@MainActor
+final class EpisodesTests: XCTestCase {
+  func testEpisodesCarryTheirCastAsCharacterCards() async {
+    let data = await EpisodesQuery.Data.from(Mock<Query>(episodes: Mock<Episodes>(
+      info: Mock<Info>(next: nil),
+      results: [
+        Mock<Episode>(
+          air_date: "December 2, 2013",
+          characters: [
+            Mock<Character>(id: "1", name: "Rick Sanchez", species: "Human", status: "Alive"),
+            Mock<Character>(id: "2", name: "Morty Smith", species: "Human", status: "Alive"),
+          ],
+          episode: "S01E01",
+          id: "1",
+          name: "Pilot"
+        ),
+      ]
+    )))
+
+    let model = EpisodesModel { _ in data }
+    await model.loadMore()
+
+    let pilot = try! XCTUnwrap(model.episodes.first)
+    XCTAssertEqual(pilot.subtitle, "S01E01 · December 2, 2013")
+    // CharacterCard is the fragment owned by the Characters feature.
+    XCTAssertEqual(pilot.cast.map(\.name), ["Rick Sanchez", "Morty Smith"])
+    XCTAssertEqual(pilot.cast.first?.subtitle, "Alive · Human")
+    XCTAssertNil(model.nextPage)
+  }
+}

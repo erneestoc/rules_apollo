@@ -1,0 +1,8 @@
+# Owned by Characters; Episodes and Locations spread it to render the same row.
+fragment CharacterCard on Character {
+  id
+  name
+  status
+  species
+  image
+}

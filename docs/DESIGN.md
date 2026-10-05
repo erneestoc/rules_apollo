@@ -159,21 +159,22 @@ None at the moment.
 
 Ordered by expected payoff for a big modular iOS app:
 
-1. **Gazelle extension.** Generate `apollo_swift_operations` per package and infer `deps` from fragment
-   spreads (fragment name → owning target). At scale, hand-maintained fragment deps are the main friction.
-2. **Schema sharding** (above), with Gazelle maintaining the shard deps.
-3. **`apollo_validate_test`.** Validate every operation against a candidate schema without generating Swift.
+1. **Schema sharding** (above), if measurements show type-level schema changes are a top build cost. Feature
+   deps on shards would need tooling to stay current.
+2. **`apollo_validate_test`.** Validate every operation against a candidate schema without generating Swift.
    Run it in the backend's CI on schema PRs to catch client breakage before the schema ships.
-4. **Schema change impact report.** Compare the generated outputs for two schema revisions and list the
+3. **Schema change impact report.** Compare the generated outputs for two schema revisions and list the
    affected modules and owners. Post it on schema-sync PRs.
-5. **Persisted queries end to end.** The manifest is already an output group. Add an upload/publish
+4. **Persisted queries end to end.** The manifest is already an output group. Add an upload/publish
    `bazel run` target and a test that fails when an operation's ID is missing from the safelist.
-6. ~~**Test mocks per feature.**~~ Done: `apollo_test_mocks`, the partition test and the updater
+5. ~~**Test mocks per feature.**~~ Done: `apollo_test_mocks`, the partition test and the updater
    ([MOCKS.md](MOCKS.md)). Mock fields in Bazel mode are fixed in the fork's second mocks release.
-7. **Deprecation tracking.** Use `warningsOnDeprecatedUsage` output aggregated per module, so field
+6. **Deprecation tracking.** Use `warningsOnDeprecatedUsage` output aggregated per module, so field
    deprecations can be routed to code owners and burned down.
-8. ~~**Multiplex worker, sandbox-safe CLI, no panics.**~~ Done in the fork and the rules. Dynamic
+7. ~~**Multiplex worker, sandbox-safe CLI, no panics.**~~ Done in the fork and the rules. Dynamic
    execution (`--strategy=ApolloCodegen=dynamic`) is not yet tested.
-9. **Schema fetch** as a repository rule or `bazel run` target (registry or introspection, with credentials
+8. **Schema fetch** as a repository rule or `bazel run` target (registry or introspection, with credentials
    from the environment), so the schema snapshot has one owner and cadence.
-10. **rules_xcodeproj check.** Verify indexing of the generated shards.
+9. ~~**rules_xcodeproj check.**~~ Done in `examples/rick_and_morty`. The generated project contains every
+   shard, builds and tests through `xcodebuild`, and the Bazel index stores carry units for every
+   generated file. Jump to definition in the Xcode UI is the only part not checked automatically.
