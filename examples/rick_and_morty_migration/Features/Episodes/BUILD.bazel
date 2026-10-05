@@ -13,33 +13,30 @@ filegroup(
 # codegen target's output (plain .swift files) goes into a swift_library of our
 # own. Characters and Locations use the macros; both styles mix in one app.
 #
-# Episodes' generated code only exists on the 2.4.0 runtime, so its module keeps
-# its plain name and needs no alias. Only what really exists on both runtimes
-# (Apollo iOS, the schema module, CharactersGraphQL) is suffixed and aliased.
+# Episodes' generated code only exists on the 2.4.0 runtime, so its module keeps its
+# plain name. Variants of runtime-aware targets are reached through their
+# `<name>.<runtime>` aliases: //graphql:RickAndMortyAPI.next is RickAndMortyAPI_v2.
 NEXT = apollo_runtime("next")
 
 apollo_operations(
     name = "EpisodesGraphQL_codegen",
     srcs = [":graphql"],
     module_name = "EpisodesGraphQL",
-    schema = "//graphql:RickAndMortyAPI_v2_apollo",
+    schema = "//graphql:RickAndMortyAPI.next_apollo",
     # Spreads CharacterCard: the 2.4.0 variant of the Characters fragments.
-    deps = ["//Features/Characters:CharactersGraphQL_v2_apollo"],
+    deps = ["//Features/Characters:CharactersGraphQL.next_apollo"],
 )
 
 swift_library(
     name = "EpisodesGraphQL",
     srcs = [":EpisodesGraphQL_codegen"],
-    # Generated code says `import ApolloAPI` and `RickAndMortyAPI.Objects...`.
-    copts = apollo_runtime_copts(
-        "next",
-        modules = ["RickAndMortyAPI"],
-    ),
+    # Generated code says `import ApolloAPI`: alias it to this runtime's ApolloAPI_v2.
+    copts = apollo_runtime_copts("next"),
     module_name = "EpisodesGraphQL",
     visibility = ["//visibility:public"],
     deps = [
-        "//Features/Characters:CharactersGraphQL_v2",
-        "//graphql:RickAndMortyAPI_v2",
+        "//Features/Characters:CharactersGraphQL.next",
+        "//graphql:RickAndMortyAPI.next",
         NEXT.apollo_api,
     ],
 )

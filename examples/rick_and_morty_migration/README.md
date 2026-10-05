@@ -19,7 +19,7 @@ How it works and the rules to follow are in [docs/MIGRATIONS.md](../../docs/MIGR
 | `//Features/CharacterUI` | none | `CharacterSummary` and the row view: what the two runtimes share |
 | `//Features/Characters:CharactersFeature` | 1.15.2 | Owns the `CharacterCard` fragment and the detail screen |
 | `//Features/Locations:LocationsFeature` | 1.15.2 | Spreads `CharacterCard` |
-| `//Features/Episodes:EpisodesGraphQL` | **2.4.0** | Raw `apollo_operations` + your own `swift_library`. Only exists on 2.4.0, so no suffix |
+| `//Features/Episodes:EpisodesGraphQL` | **2.4.0** | Raw `apollo_operations` + your own `swift_library`. Home runtime 2.4.0, so no suffix |
 | `//Features/Episodes:EpisodesFeature` | **2.4.0** | Spreads `CharacterCard` through `CharactersGraphQL_v2` |
 | `//App:RickAndMorty` | none | Composes the screens; sets how character details open |
 
@@ -48,11 +48,10 @@ codegen target's `.swift` output goes into a plain `swift_library`. Both styles 
 The generated project has a scheme for every module of both runtimes (`ApolloAPI` and `ApolloAPI_v2`,
 `CharactersGraphQL` and `CharactersGraphQL_v2`, …). Built and tested with `xcodebuild`. Worth checking by hand:
 
-- In `Features/Episodes/Sources/EpisodesScreen.swift`, jump to definition:
-  - on `EpisodesQuery`: unaliased generated module, built from raw rules;
-  - on `CharacterCard`: aliased generated module `CharactersGraphQL_v2`, built by the macros. Expected to
-    hit the [known issue](../../docs/MIGRATIONS.md#known-issue-xcode-jump-to-definition-in-aliased-generated-modules);
-  - on `.some(…)`, i.e. `GraphQLNullable`: aliased Apollo iOS, which works.
+- In `Features/Episodes/Sources/EpisodesScreen.swift`, jump to definition on `EpisodesQuery`
+  (`EpisodesGraphQL`, home runtime 2.4.0), on `CharacterCard` (`CharactersGraphQL_v2`) and on
+  `.some(…)` (`GraphQLNullable` in `ApolloAPI_v2`, through the only alias). All three should land in
+  the 2.4.0 sources.
 - In `Features/Characters/Sources/CharactersScreen.swift` the same symbols should land in 1.15.2.
 - Autocomplete and inline errors in both files.
 - Breakpoints in both features while the app runs.

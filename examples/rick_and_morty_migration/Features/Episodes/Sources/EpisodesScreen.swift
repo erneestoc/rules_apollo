@@ -1,8 +1,9 @@
-// On the "next" runtime: Apollo iOS 2.4.0. The imports are the same as on 1.15.2;
-// the build resolves them to ApolloAPI_v2, EpisodesGraphQL_v2, Networking_v2, ...
+// On the "next" runtime: Apollo iOS 2.4.0. Modules that exist on both runtimes are
+// imported by their 2.4.0 names (Networking_v2); Apollo iOS itself is aliased, so any
+// `import ApolloAPI` here would reach ApolloAPI_v2.
 import CharacterUI
 import EpisodesGraphQL
-import Networking
+import Networking_v2
 import Observation
 import SwiftUI
 

@@ -1,8 +1,8 @@
-// Apollo iOS 2.4.0: same imports as the 1.15.2 tests; they resolve to the _v2 modules.
+// Apollo iOS 2.4.0: the 2.4.0 mocks module is named explicitly.
 import ApolloTestSupport
 import EpisodesFeature
 import EpisodesGraphQL
-import RickAndMortyAPIMocks
+import RickAndMortyAPIMocks_v2
 import XCTest
 
 @MainActor

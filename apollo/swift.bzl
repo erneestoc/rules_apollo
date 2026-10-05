@@ -18,13 +18,13 @@
 Each macro creates `<name>` (the swift_library) and `<name>_apollo` (codegen).
 
 Runtimes (docs/MIGRATIONS.md): when MODULE.bazel declares `apollo.runtime(...)`s, the
-schema, operations and mocks macros create one variant per runtime instead:
-`<name><suffix>` and `<name><suffix>_apollo`, e.g. `MyAPI` and `MyAPI_v2`. The Apollo
-iOS libraries come from the runtime, so `apollo_api` / `apollo_test_support` are not
-needed. Bazel only builds the variants something depends on. Your own code picks a
-runtime with `apollo_swift_library(runtime = ...)`. With runtimes, a schema target's
-name must equal its `schema_namespace`, and a module's name must equal its target
-name: aliases are derived from target names.
+schema, operations and mocks macros create one variant per runtime: `<name>` on the
+target's home runtime (`runtime`, by default the one without a module suffix) and
+`<name><suffix>` elsewhere, each also reachable as `<name>.<runtime>`. The Apollo iOS
+libraries come from the runtime, so `apollo_api` / `apollo_test_support` are not needed.
+Bazel only builds the variants something depends on. Your own code picks a runtime with
+`apollo_swift_library(runtime = ...)`. Only Apollo iOS is aliased; other modules are
+imported by their real names (`import CharactersGraphQL_v2`).
 """
 
 load("@apollo_runtimes//:defs.bzl", "RUNTIMES")
@@ -38,14 +38,12 @@ def _label(label, suffix = "", codegen = False):
     label = native.package_relative_label(label)
     return label.same_package_label(label.name + suffix + (_CODEGEN_SUFFIX if codegen else ""))
 
+def _on(label, rt, codegen = False):
+    """The variant of a runtime-aware target on `rt`, via its `<name>.<runtime>` alias."""
+    return _label(label, "." + rt.name if rt else "", codegen)
+
 def _encode(value):
     return json.encode(value) if value else None
-
-def _runtimes(runtimes):
-    """The runtimes to create variants for; [None] means "no runtimes" (single version)."""
-    if runtimes == None:
-        return [RUNTIMES[k] for k in sorted(RUNTIMES)] if RUNTIMES else [None]
-    return [_runtime(r) for r in runtimes]
 
 def _runtime(name):
     if name not in RUNTIMES:
@@ -53,26 +51,53 @@ def _runtime(name):
              (name, ", ".join(sorted(RUNTIMES)) or "none"))
     return RUNTIMES[name]
 
-def _suffix(rt):
-    return rt.suffix if rt else ""
+def _default_home():
+    for name in sorted(RUNTIMES):
+        if not RUNTIMES[name].suffix:
+            return name
+    return sorted(RUNTIMES)[0]
 
-def _copts(rt, aliased = [], own_module = None):
-    """Swift flags for a target on runtime `rt`.
+def _variants(home, runtimes = None):
+    """[(runtime, name suffix)] for a runtime-aware target; [(None, "")] without runtimes.
 
-    Apollo module aliases, the version define, and aliases for the runtime-variant
-    modules (named after their targets) it imports.
+    The target keeps its plain name on its home runtime. Variants on other runtimes
+    get the runtime's module suffix (or `_<runtime>` when it has none).
+    """
+    if not RUNTIMES:
+        return [(None, "")]
+    home = home or _default_home()
+    _runtime(home)
+    names = runtimes if runtimes != None else sorted(RUNTIMES)
+    if home not in names:
+        fail("Home runtime %r must be one of the variants %s." % (home, names))
+    variants = []
+    for name in names:
+        rt = _runtime(name)
+        variants.append((rt, "" if name == home else (rt.suffix or "_" + name)))
+    return variants
+
+def _alias_variant(name, rt, suffix, visibility, tags, codegen = True):
+    """Declares `<name>.<runtime>` (and its codegen alias) pointing at the variant."""
+    if not rt:
+        return
+    native.alias(name = name + "." + rt.name, actual = name + suffix, visibility = visibility, tags = tags)
+    if codegen:
+        native.alias(
+            name = name + "." + rt.name + _CODEGEN_SUFFIX,
+            actual = name + suffix + _CODEGEN_SUFFIX,
+            visibility = visibility,
+            tags = tags,
+        )
+
+def _copts(rt):
+    """Swift flags for a target on runtime `rt`: Apollo iOS module aliases and the version define.
+
+    Only Apollo iOS is aliased (`import ApolloAPI` reaches `ApolloAPI_v2`); every other
+    module is referenced by its real name, e.g. `import CharactersGraphQL_v2`.
     """
     if not rt:
         return []
-    flags = runtime_aliases(rt.suffix) + runtime_defines(rt.version)
-    modules = [native.package_relative_label(dep).name for dep in aliased]
-    if own_module:
-        # Generated code refers to its own module by name (`MyAPI.Objects.Dog`).
-        modules.append(own_module)
-    if rt.suffix:
-        for module in modules:
-            flags += ["-module-alias", "%s=%s%s" % (module, module, rt.suffix)]
-    return flags
+    return runtime_aliases(rt.suffix) + runtime_defines(rt.version)
 
 def _require(value, what, rt):
     if not rt and not value:
@@ -86,31 +111,22 @@ def apollo_runtime(name):
         name: name of an apollo.runtime().
 
     Returns:
-        struct with `version`, `suffix`, and labels `cli`, `apollo_api`, `apollo`,
+        struct with `name`, `version`, `suffix`, and labels `cli`, `apollo_api`, `apollo`,
         `apollo_test_support`.
     """
     return _runtime(name)
 
 # buildifier: disable=unnamed-macro
-def apollo_runtime_copts(runtime, runtime_deps = [], modules = []):
+def apollo_runtime_copts(runtime):
     """Swift copts for a target of your own on `runtime`, for rules other than apollo_swift_library.
 
     Args:
         runtime: name of an apollo.runtime().
-        runtime_deps: runtime-variant targets it imports (schema, operations, mocks, libraries),
-            aliased by their target names.
-        modules: other module names to alias to `<name><suffix>`, e.g. the schema namespace
-            when compiling generated code of your own.
 
     Returns:
-        list of copts.
+        list of copts: Apollo iOS module aliases and `-DAPOLLO_IOS_<major>`.
     """
-    rt = _runtime(runtime)
-    flags = _copts(rt, runtime_deps)
-    if rt.suffix:
-        for module in modules:
-            flags += ["-module-alias", "%s=%s%s" % (module, module, rt.suffix)]
-    return flags
+    return _copts(_runtime(runtime))
 
 def apollo_swift_schema(
         name,
@@ -124,6 +140,7 @@ def apollo_swift_schema(
         schema_configuration = None,
         operation_manifest_version = None,
         cli = None,
+        runtime = None,
         runtimes = None,
         swift_srcs = [],
         deps = [],
@@ -131,6 +148,10 @@ def apollo_swift_schema(
         tags = [],
         **kwargs):
     """Generates schema types and compiles them into a Swift module named `schema_namespace`.
+
+    With runtimes, one variant per runtime. Off its home runtime, the variant's module and
+    its generated namespace are both `<schema_namespace><suffix>` (e.g. `MyAPI_v2`), so code
+    refers to it by its real name.
 
     Args:
         name: swift_library name. `schema_namespace` defaults to it.
@@ -144,7 +165,8 @@ def apollo_swift_schema(
         schema_configuration: your SchemaConfiguration.swift.
         operation_manifest_version: "persistedQueries" or "legacy" to emit a manifest.
         cli: per-schema CLI override, e.g. "@apollo_next//:cli". Not used with runtimes.
-        runtimes: runtime names to create variants for. Defaults to every declared runtime.
+        runtime: home runtime (plain names). Defaults to the runtime without a module suffix.
+        runtimes: runtimes to create variants for. Defaults to every declared runtime.
         swift_srcs: extra Swift sources for the module (custom scalars, extensions).
         deps: extra Swift deps.
         visibility: visibility of the targets.
@@ -153,15 +175,12 @@ def apollo_swift_schema(
     """
     namespace = schema_namespace or name
     copts = kwargs.pop("copts", [])
-    for rt in _runtimes(runtimes):
-        if rt and namespace != name:
-            fail("%s: with runtimes, the schema target's name must equal schema_namespace (%s)." % (name, namespace))
-        suffix = _suffix(rt)
+    for rt, suffix in _variants(runtime, runtimes):
         apollo_schema(
             name = name + suffix + _CODEGEN_SUFFIX,
             schema = schema,
             srcs = srcs,
-            schema_namespace = namespace,
+            schema_namespace = namespace + suffix,
             options = _encode(options),
             experimental_features = _encode(experimental_features),
             custom_scalars = custom_scalars,
@@ -176,11 +195,12 @@ def apollo_swift_schema(
             module_name = namespace + suffix,
             srcs = [name + suffix + _CODEGEN_SUFFIX] + swift_srcs,
             deps = [rt.apollo_api if rt else _require(apollo_api, "apollo_api", rt)] + deps,
-            copts = _copts(rt, own_module = namespace) + copts,
+            copts = _copts(rt) + copts,
             visibility = visibility,
             tags = tags,
             **kwargs
         )
+        _alias_variant(name, rt, suffix, visibility, tags)
 
 def apollo_swift_operations(
         name,
@@ -190,6 +210,7 @@ def apollo_swift_operations(
         deps = [],
         module_name = None,
         access_modifier = "public",
+        runtime = None,
         runtimes = None,
         swift_srcs = [],
         swift_deps = [],
@@ -197,6 +218,10 @@ def apollo_swift_operations(
         tags = [],
         **kwargs):
     """Generates one framework's operations and compiles them into a Swift module.
+
+    With runtimes, one variant per runtime: `<name>` on its home runtime, `<name><suffix>`
+    elsewhere (e.g. `CharactersGraphQL_v2`, for features on another runtime that spread its
+    fragments). Bazel only builds the variants something uses.
 
     Args:
         name: swift_library name. `module_name` defaults to it.
@@ -206,7 +231,8 @@ def apollo_swift_operations(
         deps: other apollo_swift_operations whose fragments these operations use.
         module_name: Swift module name.
         access_modifier: "public" or "internal".
-        runtimes: runtime names to create variants for. Defaults to every declared runtime.
+        runtime: home runtime (plain names). Defaults to the runtime without a module suffix.
+        runtimes: runtimes to create variants for. Defaults to every declared runtime.
         swift_srcs: extra Swift sources for the module.
         swift_deps: extra Swift deps.
         visibility: visibility of the targets.
@@ -215,13 +241,12 @@ def apollo_swift_operations(
     """
     module = module_name or name
     copts = kwargs.pop("copts", [])
-    for rt in _runtimes(runtimes):
-        suffix = _suffix(rt)
+    for rt, suffix in _variants(runtime, runtimes):
         apollo_operations(
             name = name + suffix + _CODEGEN_SUFFIX,
-            schema = _label(schema, suffix, codegen = True),
+            schema = _on(schema, rt, codegen = True),
             srcs = srcs,
-            deps = [_label(d, suffix, codegen = True) for d in deps],
+            deps = [_on(d, rt, codegen = True) for d in deps],
             module_name = module + suffix,
             access_modifier = access_modifier,
             visibility = visibility,
@@ -231,13 +256,14 @@ def apollo_swift_operations(
             name = name + suffix,
             module_name = module + suffix,
             srcs = [name + suffix + _CODEGEN_SUFFIX] + swift_srcs,
-            deps = [_label(schema, suffix), rt.apollo_api if rt else _require(apollo_api, "apollo_api", rt)] +
-                   [_label(d, suffix) for d in deps] + swift_deps,
-            copts = _copts(rt, [schema]) + copts,
+            deps = [_on(schema, rt), rt.apollo_api if rt else _require(apollo_api, "apollo_api", rt)] +
+                   [_on(d, rt) for d in deps] + swift_deps,
+            copts = _copts(rt) + copts,
             visibility = visibility,
             tags = tags,
             **kwargs
         )
+        _alias_variant(name, rt, suffix, visibility, tags)
 
 def apollo_swift_test_mocks(
         name,
@@ -252,6 +278,7 @@ def apollo_swift_test_mocks(
         module_name = None,
         access_modifier = "public",
         shards = 4,
+        runtime = None,
         runtimes = None,
         swift_srcs = [],
         deps = [],
@@ -276,7 +303,8 @@ def apollo_swift_test_mocks(
         module_name: Swift module name.
         access_modifier: "public" or "internal".
         shards: number of generated Swift files.
-        runtimes: runtime names to create variants for. Defaults to every declared runtime.
+        runtime: home runtime (plain names). Defaults to the runtime without a module suffix.
+        runtimes: runtimes to create variants for. Defaults to every declared runtime.
         swift_srcs: hand-written test helpers compiled into the same module.
         deps: extra Swift deps.
         visibility: visibility of the targets.
@@ -285,13 +313,12 @@ def apollo_swift_test_mocks(
     """
     module = module_name or name
     copts = kwargs.pop("copts", [])
-    for rt in _runtimes(runtimes):
-        suffix = _suffix(rt)
+    for rt, suffix in _variants(runtime, runtimes):
         apollo_test_mocks(
             name = name + suffix + _CODEGEN_SUFFIX,
-            schema = _label(schema, suffix, codegen = True),
-            base = _label(base, suffix, codegen = True) if base else None,
-            operations = [_label(o, suffix, codegen = True) for o in operations],
+            schema = _on(schema, rt, codegen = True),
+            base = _on(base, rt, codegen = True) if base else None,
+            operations = [_on(o, rt, codegen = True) for o in operations],
             srcs = srcs,
             types = types,
             exclude_types = exclude_types,
@@ -308,35 +335,36 @@ def apollo_swift_test_mocks(
             module_name = module + suffix,
             srcs = [name + suffix + _CODEGEN_SUFFIX] + swift_srcs,
             deps = [
-                _label(schema, suffix),
+                _on(schema, rt),
                 rt.apollo_api if rt else _require(apollo_api, "apollo_api", rt),
                 rt.apollo_test_support if rt else _require(apollo_test_support, "apollo_test_support", rt),
-            ] + ([_label(base, suffix)] if base else []) + deps,
-            copts = _copts(rt, [schema]) + copts,
+            ] + ([_on(base, rt)] if base else []) + deps,
+            copts = _copts(rt) + copts,
             testonly = True,
             visibility = visibility,
             tags = tags,
             **kwargs
         )
+        _alias_variant(name, rt, suffix, visibility, tags)
 
-def apollo_swift_mock_partition(name, base, feature_mocks, runtimes = None, visibility = None, tags = []):
+def apollo_swift_mock_partition(name, base, feature_mocks, runtime = None, runtimes = None, visibility = None, tags = []):
     """Declares `<name>` (the partition test) and `<name>_update` (bazel run to fix it).
 
-    With runtimes, one pair per runtime: `<name><suffix>` and `<name><suffix>_update`.
+    With runtimes, one pair per runtime, named like the other variants.
 
     Args:
         name: test name.
         base: the base apollo_swift_test_mocks.
         feature_mocks: every feature apollo_swift_test_mocks with that base.
-        runtimes: runtime names to create variants for. Defaults to every declared runtime.
+        runtime: home runtime (plain names). Defaults to the runtime without a module suffix.
+        runtimes: runtimes to create variants for. Defaults to every declared runtime.
         visibility: visibility of the targets.
         tags: tags for the targets.
     """
-    for rt in _runtimes(runtimes):
-        suffix = _suffix(rt)
+    for rt, suffix in _variants(runtime, runtimes):
         common = dict(
-            base = _label(base, suffix, codegen = True),
-            feature_mocks = [_label(f, suffix, codegen = True) for f in feature_mocks],
+            base = _on(base, rt, codegen = True),
+            feature_mocks = [_on(f, rt, codegen = True) for f in feature_mocks],
             testonly = True,
             visibility = visibility,
             tags = tags,
@@ -362,10 +390,10 @@ def apollo_swift_library(
         **kwargs):
     """A swift_library of your own that uses Apollo, on one runtime (or each of several).
 
-    Write the code as usual (`import ApolloAPI`, `import MyAPI`, `import FeedGraphQL`).
-    On a runtime with a module suffix, the target is compiled with module aliases so
-    those imports resolve to that runtime's modules. Migrating a module to another
-    Apollo version is changing `runtime`.
+    Code imports Apollo iOS as usual (`import ApolloAPI`); on a suffixed runtime the target
+    is compiled with aliases so that resolves to that runtime's Apollo iOS. Every other
+    module is imported by its real name: a variant on another runtime is explicit
+    (`import CharactersGraphQL_v2`).
 
     Modules on different runtimes may depend on each other only through APIs that don't
     expose Apollo or generated types (plain models, views, closures). See docs/MIGRATIONS.md.
@@ -373,13 +401,13 @@ def apollo_swift_library(
     Args:
         name: target name.
         runtime: the one runtime this module is on. Target and module keep their names.
-        runtimes: instead, build a variant per runtime (`<name><suffix>`), for shared code
-            such as networking that modules on every runtime use. Use `-D APOLLO_IOS_<major>`
-            (`#if APOLLO_IOS_2`) where the code must differ by version.
+        runtimes: instead, build a variant per runtime, for shared code such as networking
+            that modules on every runtime use. Named like the other variants (plain on the
+            home runtime, suffixed elsewhere). Use `#if APOLLO_IOS_2` where code must differ.
         srcs: Swift sources.
         deps: deps that don't depend on a runtime (plain Swift modules).
-        runtime_deps: runtime-variant targets this module imports: schemas, operations,
-            mocks and `apollo_swift_library(runtimes = ...)` targets. The matching variant is used.
+        runtime_deps: runtime-aware targets (schemas, operations, mocks, libraries built with
+            `runtimes`); the variant on this target's runtime is used.
         apollo_deps: Apollo iOS libraries of the runtime to depend on: "ApolloAPI", "Apollo",
             "ApolloTestSupport".
         module_name: Swift module name. Defaults to the target name.
@@ -387,18 +415,23 @@ def apollo_swift_library(
     """
     if bool(runtime) == bool(runtimes):
         fail("%s: set exactly one of `runtime` or `runtimes`." % name)
+    for dep in apollo_deps:
+        if dep not in _APOLLO_DEPS:
+            fail("%s: unknown apollo_deps entry %r; use %s." % (name, dep, ", ".join(_APOLLO_DEPS)))
     copts = kwargs.pop("copts", [])
-    variants = [(_runtime(runtime), "")] if runtime else [(_runtime(r), _runtime(r).suffix) for r in runtimes]
-    for rt, own_suffix in variants:
-        for dep in apollo_deps:
-            if dep not in _APOLLO_DEPS:
-                fail("%s: unknown apollo_deps entry %r; use %s." % (name, dep, ", ".join(_APOLLO_DEPS)))
+    visibility = kwargs.pop("visibility", None)
+    tags = kwargs.pop("tags", [])
+    variants = [(_runtime(runtime), "")] if runtime else _variants(None, runtimes)
+    for rt, suffix in variants:
         swift_library(
-            name = name + own_suffix,
-            module_name = (module_name or name) + own_suffix,
+            name = name + suffix,
+            module_name = (module_name or name) + suffix,
             srcs = srcs,
-            deps = deps + [_label(d, rt.suffix) for d in runtime_deps] +
-                   [getattr(rt, _APOLLO_DEPS[d]) for d in apollo_deps],
-            copts = _copts(rt, runtime_deps) + copts,
+            deps = deps + [_on(d, rt) for d in runtime_deps] + [getattr(rt, _APOLLO_DEPS[d]) for d in apollo_deps],
+            copts = _copts(rt) + copts,
+            visibility = visibility,
+            tags = tags,
             **kwargs
         )
+        if runtimes:
+            _alias_variant(name, rt, suffix, visibility, tags, codegen = False)
