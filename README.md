@@ -157,3 +157,17 @@ Bazel then uses sandboxed singleplex workers.
 See [docs/DESIGN.md](docs/DESIGN.md). It covers the versioning trade-offs, measured invalidation behavior,
 options for splitting the schema module, CLI issues, and the roadmap. Test mocks are specified in
 [docs/MOCKS.md](docs/MOCKS.md).
+
+## Development
+
+```sh
+bazel test //...                                       # analysis tests + real codegen (incl. a 2.3.0 pin)
+(cd examples/animal_kingdom && bazel test //...)       # codegen, Swift compile/link/run, mocks, partition
+tools/version_matrix.sh 1.15.1 2.0.3                   # the example end to end against other Apollo versions
+tools/update_versions.sh                               # refresh CLI checksums after fork releases
+```
+
+## License
+
+MIT. See [LICENSE](LICENSE). The GraphQL fixtures in `examples/animal_kingdom` come from
+[apollo-ios](https://github.com/apollographql/apollo-ios) (MIT).
