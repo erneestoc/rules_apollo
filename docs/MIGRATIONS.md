@@ -102,6 +102,24 @@ Only modules that exist on both runtimes need a suffix: Apollo iOS itself, the s
 libraries, and fragment owners used across the boundary. A module that only ever exists on one runtime
 keeps its plain name.
 
+### Why Apollo iOS stays aliased
+
+The alternative is explicit names everywhere: 2.4.0 code writes `import ApolloAPI_v2`, and the CLI emits it in
+generated code. That would need a CLI option for the Apollo module names. It's possible (the templates
+already have a hook for it), but not required. The alias is kept because:
+
+- it is confined to Apollo iOS: `ApolloAPI`, `Apollo`, `ApolloTestSupport`;
+- engineers write the same `import ApolloAPI` on both runtimes;
+- Xcode navigates through it correctly.
+
+It is applied together with the matching runtime's dependencies by `apollo_swift_library` and the macros,
+so `import ApolloAPI` on `next` can only mean `ApolloAPI_v2`. Two caveats:
+
+- When compiling generated code yourself (raw rules), add `apollo_runtime_copts(runtime)` to that
+  `swift_library`. Without it, `import ApolloAPI` binds to whichever `ApolloAPI` is reachable.
+- Tools that infer BUILD dependencies from `import` statements map `ApolloAPI` to one target. In code on a
+  suffixed runtime, take Apollo iOS dependencies from `apollo_deps` rather than from inference.
+
 ## The one rule: no Apollo types across runtimes
 
 A module on one runtime may depend on a module on the other runtime, but only through an API that doesn't
