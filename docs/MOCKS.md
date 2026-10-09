@@ -233,7 +233,7 @@ and that every `types` entry is either shared or unselected (§6).
 
 ```python
 apollo_test_mocks(
-    name,                 # codegen target; outputs are sharded .swift files (see shards)
+    name,                 # codegen target; outputs a directory of generated .swift files
     schema,               # label: apollo_schema (ApolloSchemaInfo). Mandatory.
     base = None,          # label: the base apollo_test_mocks (ApolloTestMocksInfo). None => this target IS the base.
     operations = [],      # labels: apollo_operations targets whose srcs define the `referenced` scope (features only).
@@ -242,7 +242,6 @@ apollo_test_mocks(
     exclude_types = [],   # base only: feature-owned types the base must not generate (written by the updater).
     module_name = None,   # Swift module the mocks compile into; defaults to name. Becomes `baseModule` for dependants.
     access_modifier = "public",
-    shards = 4,
     testonly = True,
 )
 ```
@@ -275,9 +274,8 @@ def _apollo_test_mocks_impl(ctx):
                     outputs = [out], mnemonic = "ApolloTestMocks",
                     execution_requirements = codegen_execution_requirements(),
                     env = worker_env(schema.label), ...)
-    swift_srcs = shard_swift_sources(ctx, out, ctx.attr.shards)
     return [
-        DefaultInfo(files = depset(swift_srcs)),
+        DefaultInfo(files = depset([out, module_placeholder(ctx)])),
         OutputGroupInfo(generated_tree = depset([out])),
         ApolloTestMocksInfo(schema = schema.label, module_name = module_name, base = base_label_or_None,
                             types = ctx.attr.types, exclude_types = ctx.attr.exclude_types,

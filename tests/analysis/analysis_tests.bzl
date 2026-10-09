@@ -22,6 +22,9 @@ def _values(argv, flag):
 def _config(argv):
     return json.decode(_values(argv, "--string")[0])
 
+def _output_basenames(env):
+    return sorted([f.basename for f in analysistest.target_under_test(env)[DefaultInfo].files.to_list()])
+
 def _schema_action_test_impl(ctx):
     env = analysistest.begin(ctx)
     target = analysistest.target_under_test(env)
@@ -41,6 +44,9 @@ def _schema_action_test_impl(ctx):
     asserts.equals(env, False, config["options"]["pruneGeneratedFiles"])
     asserts.equals(env, "include", config["options"]["schemaDocumentation"])
     asserts.equals(env, "TestAPI", target[ApolloSchemaInfo].namespace)
+
+    # The CLI's output directory is the module's sources as is.
+    asserts.equals(env, ["schema_schema_types"], _output_basenames(env))
     return analysistest.end(env)
 
 schema_action_test = analysistest.make(_schema_action_test_impl)
@@ -59,9 +65,8 @@ def _operations_action_test_impl(ctx):
     asserts.equals(env, {"path": ".", "accessModifier": "public"}, config["output"]["operations"]["absolute"])
     asserts.equals(env, Label("//tests/analysis:schema"), Label(action.env.get("APOLLO_WORKER_SCHEMA")))
 
-    outputs = [f.basename for f in analysistest.target_under_test(env)[DefaultInfo].files.to_list()]
-    imports = analysistest.target_under_test(env).label.name + "_ApolloImports.swift"
-    asserts.true(env, imports in outputs, "missing %s in %s" % (imports, outputs))
+    name = analysistest.target_under_test(env).label.name
+    asserts.equals(env, sorted([name + "_operations", name + "_ApolloImports.swift"]), _output_basenames(env))
     return analysistest.end(env)
 
 operations_action_test = analysistest.make(
@@ -90,6 +95,10 @@ def _mocks_action_test_impl(ctx):
     asserts.equals(env, ctx.attr.base_module, _values(argv, "--bazel-mocks-base-module"))
     asserts.equals(env, ctx.attr.excluded, _values(argv, "--bazel-mocks-exclude"))
     asserts.equals(env, ctx.attr.generate_for, _values(argv, "--bazel-generate-for"))
+
+    # Mocks can generate nothing, so the module also gets a placeholder file.
+    name = analysistest.target_under_test(env).label.name
+    asserts.equals(env, sorted([name + "_test_mocks", name + "_Module.swift"]), _output_basenames(env))
     return analysistest.end(env)
 
 mocks_action_test = analysistest.make(
@@ -99,6 +108,29 @@ mocks_action_test = analysistest.make(
         "base_module": attr.string_list(),
         "excluded": attr.string_list(),
         "generate_for": attr.string_list(),
+    },
+)
+
+def _schema_filter_test_impl(ctx):
+    env = analysistest.begin(ctx)
+    filters = [a for a in analysistest.target_actions(env) if a.mnemonic == "ApolloFilterSources"]
+    asserts.equals(env, 1, len(filters))
+    filtered = filters[0].outputs.to_list()
+
+    # Replaced files are left out of a copy of the CLI's output directory.
+    asserts.equals(env, ctx.attr.excluded, filters[0].argv[-len(ctx.attr.excluded):])
+    asserts.equals(
+        env,
+        sorted([f.basename for f in filtered] + ctx.attr.extra_outputs),
+        _output_basenames(env),
+    )
+    return analysistest.end(env)
+
+schema_filter_test = analysistest.make(
+    _schema_filter_test_impl,
+    attrs = {
+        "excluded": attr.string_list(),
+        "extra_outputs": attr.string_list(),
     },
 )
 

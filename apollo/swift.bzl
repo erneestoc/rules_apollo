@@ -277,7 +277,6 @@ def apollo_swift_test_mocks(
         exclude_types = [],
         module_name = None,
         access_modifier = "public",
-        shards = 4,
         runtime = None,
         runtimes = None,
         swift_srcs = [],
@@ -302,7 +301,6 @@ def apollo_swift_test_mocks(
         exclude_types: base only: feature-owned types (maintained by the partition updater).
         module_name: Swift module name.
         access_modifier: "public" or "internal".
-        shards: number of generated Swift files.
         runtime: home runtime (plain names). Defaults to the runtime without a module suffix.
         runtimes: runtimes to create variants for. Defaults to every declared runtime.
         swift_srcs: hand-written test helpers compiled into the same module.
@@ -324,7 +322,6 @@ def apollo_swift_test_mocks(
             exclude_types = exclude_types,
             module_name = module + suffix,
             access_modifier = access_modifier,
-            shards = shards,
             build_target = name,
             testonly = True,
             visibility = visibility,

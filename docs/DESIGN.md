@@ -24,10 +24,12 @@
 * **Config.** The rules build the whole `apollo-codegen-config.json` at analysis time. `input` holds the
   exact `File.path`s Bazel declared, and the config is passed with `--string` in a params file. The CLI
   never globs the source tree.
-* **Outputs.** The CLI writes a tree artifact. A small `ApolloShard` action packs it into a fixed number of
-  declared `.swift` files (hashed by path), because Swift rules don't handle directory sources well.
-  `rules_swift` declares one `.o` per source `File`, and a tree artifact is one `File`. With shards, Swift
-  compiles in parallel, and adding a type rewrites one shard.
+* **Outputs.** The CLI writes a tree artifact, which goes straight into the `swift_library`'s `srcs`.
+  rules_swift (4.2.0 and later) compiles a directory file by file, with one object per generated file, so
+  Swift compiles in parallel and adding a type recompiles only what changed. Files the user replaces
+  (`schema_configuration`, `custom_scalars`) are left out by copying the directory without them. Targets
+  that can generate nothing (operations, mocks) also get an empty `<name>_Module.swift`, since swiftc
+  rejects a module without input files.
 
 ### Persistent workers
 

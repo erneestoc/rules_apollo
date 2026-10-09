@@ -11,7 +11,7 @@ bazel_dep(name = "buildozer", version = "10.1.0")
 
 # Only needed by //apollo:swift.bzl. Kept as a regular dep so the macros work
 # out of the box; the core rules do not load rules_swift.
-bazel_dep(name = "rules_swift", version = "3.6.1", repo_name = "build_bazel_rules_swift")
+bazel_dep(name = "rules_swift", version = "4.2.0", repo_name = "build_bazel_rules_swift")
 
 apollo = use_extension("//apollo:extensions.bzl", "apollo")
 

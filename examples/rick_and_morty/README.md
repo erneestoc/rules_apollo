@@ -53,9 +53,8 @@ Pick the `RickAndMorty` scheme and an iPhone simulator, then Run (⌘R). Pick a 
 Test (⌘U). Xcode builds through Bazel, so codegen runs as part of the build: edit a `.graphql` file, build,
 and the new fields are available in Swift.
 
-Generated code shows up in the project as `<target>_apollo_*_N.swift` files. Each packs several generated
-files, with a `// rules_apollo: <original path>` line marking where each one starts. Jump to definition on
-a generated type (e.g. `CharacterCard`) lands in the shard that contains it.
+Generated code shows up in the project as the CLI writes it, in `<target>_apollo_*` folders with one file
+per type or operation. Jump to definition on a generated type (e.g. `CharacterCard`) lands in its file.
 
 Rerun `bazel run //:xcodeproj` after adding targets or packages. Edits to existing `.graphql` and `.swift`
 files don't need it.

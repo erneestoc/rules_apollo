@@ -2,7 +2,7 @@
 
 load(":config.bzl", "codegen_config")
 load(":providers.bzl", "ApolloOperationsInfo", "ApolloSchemaInfo", "ApolloTestMocksInfo")
-load(":shard.bzl", "shard_swift_sources")
+load(":sources.bzl", "generated_swift_sources", "module_placeholder")
 load(":toolchain.bzl", "APOLLO_TOOLCHAIN_TYPE", "resolve_cli_for_schema")
 load(":worker.bzl", "codegen_args", "codegen_execution_requirements", "worker_env")
 
@@ -82,7 +82,7 @@ def _apollo_test_mocks_impl(ctx):
     _run_test_mocks(ctx, schema, out, ctx.attr.access_modifier, generate_for, extra)
 
     return [
-        DefaultInfo(files = depset(shard_swift_sources(ctx, out, ctx.attr.shards))),
+        DefaultInfo(files = depset([generated_swift_sources(ctx, out), module_placeholder(ctx)])),
         OutputGroupInfo(generated_tree = depset([out])),
         ApolloTestMocksInfo(
             schema = schema.label,
@@ -127,7 +127,6 @@ exactly one module; `apollo_mock_partition_test` checks that. See docs/MOCKS.md.
         ),
         "module_name": attr.string(doc = "Swift module of the mocks. Defaults to the target name."),
         "access_modifier": attr.string(default = "public", values = ["public", "internal"]),
-        "shards": attr.int(default = 4, doc = "Number of Swift files the mocks are packed into."),
         "build_target": attr.string(
             doc = "Name of the target in this package that declares `types` (set by macros), for the updater.",
         ),

@@ -2,7 +2,7 @@
 
 load(":config.bzl", "build_base_config", "codegen_config")
 load(":providers.bzl", "ApolloCliInfo", "ApolloSchemaInfo")
-load(":shard.bzl", "shard_swift_sources")
+load(":sources.bzl", "generated_swift_sources")
 load(":toolchain.bzl", "APOLLO_TOOLCHAIN_TYPE", "resolve_cli")
 load(":worker.bzl", "codegen_args", "codegen_execution_requirements", "worker_env")
 
@@ -17,7 +17,7 @@ def _apollo_schema_impl(ctx):
     # Schema types. Apollo only emits types referenced by some operation, which is
     # why this target sees every .graphql file in the app. The CLI also writes its
     # default SchemaConfiguration.swift and one String typealias per custom scalar;
-    # the ones the user implements are left out when sharding.
+    # the ones the user implements are left out.
     schema_types = ctx.actions.declare_directory(ctx.label.name + "_schema_types")
     args = codegen_args(
         ctx,
@@ -41,7 +41,7 @@ def _apollo_schema_impl(ctx):
     replaced = ["CustomScalars/%s.swift" % name for name in ctx.attr.custom_scalars]
     if ctx.file.schema_configuration:
         replaced.append("SchemaConfiguration.swift")
-    outputs = shard_swift_sources(ctx, schema_types, ctx.attr.shards, exclude = replaced)
+    outputs = [generated_swift_sources(ctx, schema_types, exclude = replaced)]
     if ctx.file.schema_configuration:
         outputs.append(ctx.file.schema_configuration)
 
@@ -89,8 +89,8 @@ apollo_schema = rule(
     implementation = _apollo_schema_impl,
     doc = """Generates the schema-types Swift module for a GraphQL schema.
 
-The default outputs are plain Swift files (see `shards`) meant for a
-`swift_library` whose `module_name` equals `schema_namespace`. Operation modules are
+The default output is a directory of generated Swift files (plus
+`schema_configuration`, if set) meant for a `swift_library` whose `module_name` equals `schema_namespace`. Operation modules are
 generated separately by `apollo_operations` targets that point at this one.
 
 `srcs` must contain every .graphql file of the app: Apollo generates only the schema
@@ -129,11 +129,6 @@ byte-identical, so nothing downstream recompiles.""",
         "operation_manifest_version": attr.string(
             values = ["", "persistedQueries", "legacy"],
             doc = "If set, also produces an operation manifest in the `operation_manifest` output group.",
-        ),
-        "shards": attr.int(
-            default = 16,
-            doc = "Number of Swift files the generated schema types are packed into. More shards " +
-                  "means more compile parallelism and smaller incremental recompiles.",
         ),
         "cli": attr.label(
             providers = [ApolloCliInfo],

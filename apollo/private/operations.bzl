@@ -2,7 +2,7 @@
 
 load(":config.bzl", "codegen_config")
 load(":providers.bzl", "ApolloOperationsInfo", "ApolloSchemaInfo")
-load(":shard.bzl", "shard_swift_sources")
+load(":sources.bzl", "generated_swift_sources", "module_placeholder")
 load(":toolchain.bzl", "APOLLO_TOOLCHAIN_TYPE", "resolve_cli_for_schema")
 load(":worker.bzl", "codegen_args", "codegen_execution_requirements", "worker_env")
 
@@ -56,7 +56,7 @@ def _apollo_operations_impl(ctx):
         toolchain = None if schema.cli_override else APOLLO_TOOLCHAIN_TYPE,
     )
 
-    outputs = shard_swift_sources(ctx, out, ctx.attr.shards)
+    outputs = [generated_swift_sources(ctx, out)]
     if ctx.attr.deps:
         imports = ctx.actions.declare_file(ctx.label.name + "_ApolloImports.swift")
         ctx.actions.write(imports, _IMPORTS.format(
@@ -67,6 +67,9 @@ def _apollo_operations_impl(ctx):
             }.keys())),
         ))
         outputs.append(imports)
+    else:
+        # Without `deps` there is no imports file, and `srcs` can generate nothing (e.g. none).
+        outputs.append(module_placeholder(ctx))
 
     return [
         DefaultInfo(files = depset(outputs)),
@@ -106,10 +109,6 @@ memory, so each target only pays for compiling its own operations.""",
         ),
         "module_name": attr.string(
             doc = "Swift module the generated code is compiled into. Defaults to the target name.",
-        ),
-        "shards": attr.int(
-            default = 4,
-            doc = "Number of Swift files the generated code is packed into.",
         ),
         "access_modifier": attr.string(
             default = "public",

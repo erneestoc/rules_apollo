@@ -1,5 +1,5 @@
 load("//apollo:defs.bzl", "apollo_operations", "apollo_schema", "apollo_test_mocks", "apollo_toolchain")
-load(":analysis_tests.bzl", "failure_test", "mocks_action_test", "operations_action_test", "schema_action_test")
+load(":analysis_tests.bzl", "failure_test", "mocks_action_test", "operations_action_test", "schema_action_test", "schema_filter_test")
 
 apollo_schema(
     name = "schema",
@@ -11,6 +11,25 @@ apollo_schema(
     schema = ["schema.graphqls"],
     schema_namespace = "TestAPI",
     visibility = ["//tests:__subpackages__"],
+)
+
+apollo_schema(
+    name = "schema_with_replaced_files",
+    srcs = ["//tests/analysis/a:A.graphql"],
+    custom_scalars = ["Date"],
+    schema = ["schema.graphqls"],
+    schema_configuration = "SchemaConfiguration.swift",
+    tags = ["manual"],
+)
+
+schema_filter_test(
+    name = "schema_filter_test",
+    excluded = [
+        "CustomScalars/Date.swift",
+        "SchemaConfiguration.swift",
+    ],
+    extra_outputs = ["SchemaConfiguration.swift"],
+    target_under_test = ":schema_with_replaced_files",
 )
 
 # A stand-in CLI that claims to be an old release, for version gating.

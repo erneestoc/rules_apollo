@@ -31,6 +31,9 @@ Prebuilt CLIs are available for `aarch64-apple-darwin`, `aarch64-linux` and `x86
 covers Apple Silicon and Linux remote execution. Intel Macs need a CLI built from source and
 registered with `apollo_toolchain`.
 
+The generated code is a directory of Swift files per target, which `swift_library` compiles file by
+file. That needs rules_swift 4.2.0 or later, which rules_apollo depends on.
+
 Three complete examples:
 - [`examples/rick_and_morty`](examples/rick_and_morty): a modular SwiftUI app for the public Rick and Morty
   API, with rules_apple, rules_xcodeproj, per-feature modules and mocks, and simulator tests.
@@ -97,7 +100,6 @@ fragment from a target not listed in `deps` fails codegen with `Unknown fragment
 | `apollo_operations.access_modifier` | `output.operations.absolute.accessModifier` |
 | `schema_configuration` | Your `SchemaConfiguration.swift`, replacing the generated default |
 | `custom_scalars` | Custom scalars you implement yourself. The CLI's default `typealias <Name> = String` is dropped for them |
-| `shards` | How many `.swift` files the generated code is packed into |
 
 `input` and `output` are owned by the rules.
 
