@@ -34,8 +34,11 @@
 ### Persistent workers
 
 The fork's CLI implements the worker protocol (`--persistent_worker`), including multiplex. One worker
-process serves concurrent requests from a shared parsed schema. Its compilation cache is keyed on the config
-text plus the schema and operation digests, and holds 8 entries.
+process serves concurrent requests from a shared parsed schema and its converted types. Its compilation
+cache is keyed on the config text plus the schema and operation digests. Concurrent requests for the same
+compilation wait for one compile, and compilations that served several requests (the whole app's, shared by
+schema types and every mocks target) are kept apart from the one-off compilations of operations targets, so
+those never evict them. Test mocks requests also share the fields collected from every operation.
 
 Actions declare `supports-workers` and `supports-multiplex-workers`. The CLI ignores
 `WorkRequest.sandbox_dir`, so they do not declare `supports-multiplex-sandboxing`. With `--worker_sandboxing`,
@@ -47,8 +50,12 @@ operations and mocks all use the `ApolloCodegen` mnemonic, so they share that wo
 
 Measured on the example from a clean build: one multiplex process served all 12 codegen requests (schema
 types, two operation modules, mocks and the partition test's reference sets) and parsed the schema once.
-A feature request after the first takes about 10 ms. The real schema parse cost only appears on large
-schemas; the fork's notes cite about 5 s.
+A feature request after the first takes about 10 ms.
+
+On a synthetic large app (GitHub's schema, 300 features, 612 codegen actions, 16 cores), a cold build's
+codegen takes about 1.1 s with workers. Without workers each action is a fresh process that loads the schema:
+about 40 ms per operations target on GitHub's schema (715 KB) and about 240 ms on a ~500k-line schema
+(13 times GitHub's, 9.4 MB), most of it parsing the SDL.
 
 ## Q: should the Apollo version be configurable per module, or should there be rules per version?
 
