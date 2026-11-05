@@ -1,4 +1,6 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
+load(":toolchain.bzl", "codegen_exec_toolchain")
 
 # Exec-platform settings used by the `@<name>//:cli` aliases from the extension.
 [
@@ -22,6 +24,36 @@ load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
         ],
     }.items()
 ]
+
+# --@rules_apollo//apollo:codegen_exec. Codegen rules require this toolchain type:
+# with "auto" it resolves on any execution platform, with "local" only on one that
+# matches the host, so the apollo toolchain (and any `cli` override) is the host's.
+codegen_exec_toolchain(name = "codegen_exec_impl")
+
+config_setting(
+    name = "codegen_exec_auto",
+    flag_values = {"//apollo:codegen_exec": "auto"},
+)
+
+config_setting(
+    name = "codegen_exec_local",
+    flag_values = {"//apollo:codegen_exec": "local"},
+)
+
+toolchain(
+    name = "codegen_exec_auto_toolchain",
+    target_settings = [":codegen_exec_auto"],
+    toolchain = ":codegen_exec_impl",
+    toolchain_type = "//apollo:codegen_exec_toolchain_type",
+)
+
+toolchain(
+    name = "codegen_exec_local_toolchain",
+    exec_compatible_with = HOST_CONSTRAINTS,
+    target_settings = [":codegen_exec_local"],
+    toolchain = ":codegen_exec_impl",
+    toolchain_type = "//apollo:codegen_exec_toolchain_type",
+)
 
 bzl_library(
     name = "rules",

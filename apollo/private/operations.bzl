@@ -3,7 +3,7 @@
 load(":config.bzl", "codegen_config")
 load(":providers.bzl", "ApolloOperationsInfo", "ApolloSchemaInfo")
 load(":sources.bzl", "generated_swift_sources", "module_placeholder")
-load(":toolchain.bzl", "APOLLO_TOOLCHAIN_TYPE", "resolve_cli_for_schema")
+load(":toolchain.bzl", "APOLLO_TOOLCHAIN_TYPE", "CODEGEN_EXEC_ATTRS", "CODEGEN_TOOLCHAINS", "resolve_cli_for_schema")
 load(":worker.bzl", "codegen_args", "codegen_execution_requirements", "worker_env")
 
 _IMPORTS = """\
@@ -55,7 +55,7 @@ def _apollo_operations_impl(ctx):
         outputs = [out],
         mnemonic = "ApolloCodegen",
         progress_message = "Generating Apollo operations %{label}",
-        execution_requirements = codegen_execution_requirements(),
+        execution_requirements = codegen_execution_requirements(ctx),
         env = worker_env(schema.label),
         toolchain = None if schema.cli_override else APOLLO_TOOLCHAIN_TYPE,
     )
@@ -108,7 +108,7 @@ generated `import <schema_namespace>` is then stripped.
 
 Runs on the same persistent worker as its schema, which keeps the parsed schema in
 memory, so each target only pays for compiling its own operations.""",
-    attrs = {
+    attrs = dict(CODEGEN_EXEC_ATTRS, **{
         "schema": attr.label(
             mandatory = True,
             providers = [ApolloSchemaInfo],
@@ -134,7 +134,7 @@ memory, so each target only pays for compiling its own operations.""",
             values = ["public", "internal"],
             doc = "Access modifier of the generated operations and fragments.",
         ),
-    },
+    }),
     provides = [ApolloOperationsInfo],
-    toolchains = [config_common.toolchain_type(APOLLO_TOOLCHAIN_TYPE, mandatory = False)],
+    toolchains = CODEGEN_TOOLCHAINS,
 )

@@ -3,7 +3,7 @@
 load(":config.bzl", "build_base_config", "codegen_config")
 load(":providers.bzl", "ApolloCliInfo", "ApolloSchemaInfo")
 load(":sources.bzl", "generated_swift_sources")
-load(":toolchain.bzl", "APOLLO_TOOLCHAIN_TYPE", "resolve_cli")
+load(":toolchain.bzl", "APOLLO_TOOLCHAIN_TYPE", "CODEGEN_EXEC_ATTRS", "CODEGEN_TOOLCHAINS", "codegen_exec_requirements", "resolve_cli")
 load(":worker.bzl", "codegen_args", "codegen_execution_requirements", "worker_env")
 
 def _apollo_schema_impl(ctx):
@@ -34,7 +34,7 @@ def _apollo_schema_impl(ctx):
         outputs = [schema_types],
         mnemonic = "ApolloCodegen",
         progress_message = "Generating Apollo schema types %{label}",
-        execution_requirements = codegen_execution_requirements(),
+        execution_requirements = codegen_execution_requirements(ctx),
         env = worker_env(ctx.label),
         toolchain = None if ctx.attr.cli else APOLLO_TOOLCHAIN_TYPE,
     )
@@ -69,6 +69,7 @@ def _apollo_schema_impl(ctx):
             inputs = depset(schema_files + operation_files),
             outputs = [manifest],
             mnemonic = "ApolloOperationManifest",
+            execution_requirements = codegen_exec_requirements(ctx),
             progress_message = "Generating Apollo operation manifest %{label}",
             toolchain = None if ctx.attr.cli else APOLLO_TOOLCHAIN_TYPE,
         )
@@ -101,7 +102,7 @@ generated separately by `apollo_operations` targets that point at this one.
 types that some operation references. Bazel's content-based early cutoff means an
 operation change that does not change the set of referenced types leaves the outputs
 byte-identical, so nothing downstream recompiles.""",
-    attrs = {
+    attrs = dict(CODEGEN_EXEC_ATTRS, **{
         "schema": attr.label_list(
             mandatory = True,
             allow_files = [".graphqls", ".graphql", ".json"],
@@ -148,7 +149,7 @@ byte-identical, so nothing downstream recompiles.""",
             cfg = "exec",
             doc = "Overrides the registered toolchain, e.g. to migrate one schema to a new Apollo version.",
         ),
-    },
+    }),
     provides = [ApolloSchemaInfo],
-    toolchains = [config_common.toolchain_type(APOLLO_TOOLCHAIN_TYPE, mandatory = False)],
+    toolchains = CODEGEN_TOOLCHAINS,
 )

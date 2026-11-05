@@ -1,5 +1,5 @@
 load("//apollo:defs.bzl", "apollo_operations", "apollo_schema", "apollo_test_mocks", "apollo_toolchain")
-load(":analysis_tests.bzl", "failure_test", "mocks_action_test", "operations_action_test", "outputs_test", "schema_action_test", "schema_filter_test")
+load(":analysis_tests.bzl", "OTHER_OS_CONSTRAINTS", "codegen_exec_auto_test", "codegen_exec_local_test", "failure_test", "mocks_action_test", "operations_action_test", "outputs_test", "schema_action_test", "schema_filter_test")
 
 apollo_schema(
     name = "schema",
@@ -270,4 +270,47 @@ failure_test(
     name = "feature_scope_outside_schema_test",
     expected = "are not in the srcs of",
     target_under_test = ":feature_scope_outside_schema",
+)
+
+# --@rules_apollo//apollo:codegen_exec: with a remote platform of the other OS
+# registered, "auto" runs every CLI action (codegen and the operation manifest) there
+# with that OS's CLI, and "local" keeps them on this machine with its own CLI.
+platform(
+    name = "other_os_platform",
+    constraint_values = OTHER_OS_CONSTRAINTS,
+)
+
+apollo_schema(
+    name = "schema_with_manifest",
+    srcs = ["Second.graphql"],
+    operation_manifest_version = "persistedQueries",
+    schema = ["schema.graphqls"],
+    tags = ["manual"],
+)
+
+codegen_exec_auto_test(
+    name = "codegen_exec_auto_test",
+    target_under_test = ":schema_with_manifest",
+)
+
+codegen_exec_local_test(
+    name = "codegen_exec_local_test",
+    target_under_test = ":schema_with_manifest",
+)
+
+codegen_exec_local_test(
+    name = "codegen_exec_local_operations_test",
+    target_under_test = "//tests/analysis/other",
+)
+
+codegen_exec_local_test(
+    name = "codegen_exec_local_mocks_test",
+    target_under_test = ":feature_mocks",
+)
+
+# A per-schema `cli` (an alias that selects on the execution platform) also resolves
+# on the host in local mode.
+codegen_exec_local_test(
+    name = "codegen_exec_local_cli_override_test",
+    target_under_test = ":pinned_schema",
 )

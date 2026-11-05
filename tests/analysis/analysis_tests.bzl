@@ -1,6 +1,7 @@
 """Analysis tests for rules_apollo."""
 
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
+load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
 load("//apollo:defs.bzl", "ApolloSchemaInfo")
 
 def _find_codegen_action(env):
@@ -164,6 +165,54 @@ outputs_test = analysistest.make(
         "excluded": attr.string_list(),
         "outputs": attr.string_list(),
     },
+)
+
+def _triple(constraints):
+    os = "apple-darwin" if [c for c in constraints if c.endswith("os:osx") or c.endswith("os:macos")] else "unknown-linux"
+    cpu = "x86_64" if [c for c in constraints if c.endswith("cpu:x86_64")] else "aarch64"
+    return "%s-%s" % (cpu, os)
+
+# The CLI triple of this machine, and of a remote platform with the other OS
+# (//tests/analysis:other_os_platform).
+HOST_TRIPLE = _triple(HOST_CONSTRAINTS)
+OTHER_OS_TRIPLE = "x86_64-unknown-linux" if "darwin" in HOST_TRIPLE else "aarch64-apple-darwin"
+OTHER_OS_CONSTRAINTS = [
+    "@platforms//os:linux",
+    "@platforms//cpu:x86_64",
+] if "darwin" in HOST_TRIPLE else [
+    "@platforms//os:macos",
+    "@platforms//cpu:aarch64",
+]
+
+def _codegen_exec_test_impl(ctx):
+    env = analysistest.begin(ctx)
+    cli_actions = [
+        a
+        for a in analysistest.target_actions(env)
+        if a.mnemonic in ("ApolloCodegen", "ApolloOperationManifest")
+    ]
+    asserts.true(env, len(cli_actions) > 0, "no CLI actions")
+    for action in cli_actions:
+        cli = action.argv[0]
+        asserts.true(env, ctx.attr.triple in cli, "%s runs %s, expected the %s CLI" % (action.mnemonic, cli, ctx.attr.triple))
+    return analysistest.end(env)
+
+_CODEGEN_EXEC = str(Label("//apollo:codegen_exec"))
+_PLATFORMS = "//command_line_option:extra_execution_platforms"
+_OTHER_OS = str(Label("//tests/analysis:other_os_platform"))
+
+# A remote platform of the other OS is registered first, so "auto" picks it.
+codegen_exec_auto_test = analysistest.make(
+    _codegen_exec_test_impl,
+    attrs = {"triple": attr.string(default = OTHER_OS_TRIPLE)},
+    config_settings = {_PLATFORMS: [_OTHER_OS]},
+)
+
+# With "local", codegen stays on this machine and uses its CLI.
+codegen_exec_local_test = analysistest.make(
+    _codegen_exec_test_impl,
+    attrs = {"triple": attr.string(default = HOST_TRIPLE)},
+    config_settings = {_PLATFORMS: [_OTHER_OS], _CODEGEN_EXEC: "local"},
 )
 
 def _failure_test_impl(ctx):

@@ -19,7 +19,11 @@ apollo = use_extension("//apollo:extensions.bzl", "apollo")
 apollo.toolchain(version = "2.4.0")
 use_repo(apollo, "apollo_runtimes", "apollo_toolchains")
 
-register_toolchains("@apollo_toolchains//:all")
+register_toolchains(
+    "@apollo_toolchains//:all",
+    "//apollo/private:codegen_exec_auto_toolchain",
+    "//apollo/private:codegen_exec_local_toolchain",
+)
 
 # Tests: a second, unregistered CLI version used through apollo_schema(cli = ...).
 apollo_dev = use_extension("//apollo:extensions.bzl", "apollo", dev_dependency = True)

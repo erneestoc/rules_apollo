@@ -183,6 +183,23 @@ Each schema gets one worker process that parses the schema once and serves concu
 types, operations and mocks. A typical feature takes milliseconds. `--worker_sandboxing` is supported;
 Bazel then uses sandboxed singleplex workers.
 
+### Where codegen runs (macOS, Linux, remote execution)
+
+Prebuilt CLIs exist for macOS (Apple Silicon) and Linux (x86_64, arm64), and Bazel picks the one for the
+machine that runs each codegen action, so builds work from either OS and with any mix of execution
+platforms. By default (`auto`) codegen runs wherever Bazel schedules it, e.g. on Linux remote executors.
+To keep codegen on the machine running Bazel, with its own CLI and persistent workers, while other
+actions run remotely:
+
+```
+build --@rules_apollo//apollo:codegen_exec=local
+build --strategy=ApolloCodegen=worker,local
+```
+
+`local` pins every codegen target (including `cli` overrides and runtimes) to an execution platform
+matching the host and marks the CLI actions `no-remote-exec`. Their results still go to the remote cache,
+so e.g. a Linux machine can generate code that Mac remote executors compile.
+
 ## Design and roadmap
 
 See [docs/DESIGN.md](docs/DESIGN.md). It covers the versioning trade-offs, measured invalidation behavior,

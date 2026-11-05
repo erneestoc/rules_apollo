@@ -1,7 +1,27 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 
 toolchain_type(
     name = "toolchain_type",
+    visibility = ["//visibility:public"],
+)
+
+# Where codegen runs. "auto": on any execution platform, with the CLI built for it
+# (e.g. remote Linux). "local": on the machine running Bazel, with its CLI and
+# persistent workers, even when other actions run remotely.
+string_flag(
+    name = "codegen_exec",
+    build_setting_default = "auto",
+    values = [
+        "auto",
+        "local",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# Constrains the execution platform of codegen targets according to :codegen_exec.
+toolchain_type(
+    name = "codegen_exec_toolchain_type",
     visibility = ["//visibility:public"],
 )
 

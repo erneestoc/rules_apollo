@@ -38,6 +38,18 @@
   `module_name` is the schema's namespace is compiled into the schema module: its CLI action gets
   `--bazel-strip-import <namespace>`, and dependents don't re-export that module.
 
+### Execution platforms
+
+Codegen rules resolve the CLI through toolchain resolution: one `toolchain()` per prebuilt triple with
+its OS and CPU as `exec_compatible_with`, so each codegen target runs on an execution platform that has a
+CLI and gets that platform's binary. `cli` overrides are aliases that `select()` on the same constraints
+in the exec configuration. `--@rules_apollo//apollo:codegen_exec=local` works through a second,
+mandatory toolchain type (`//apollo:codegen_exec_toolchain_type`) that the codegen rules require: its
+`auto` implementation fits any platform, its `local` one only platforms matching `HOST_CONSTRAINTS`.
+In local mode the target's execution platform is therefore one the host can run, which also decides the
+`cli` alias, and the CLI actions get `no-remote-exec` so a remote platform with the host's OS does not run
+them remotely. The merge and filter actions are portable shell and stay unconstrained.
+
 ### Persistent workers
 
 The fork's CLI implements the worker protocol (`--persistent_worker`), including multiplex. One worker

@@ -1,8 +1,30 @@
 """The apollo-ios-cli toolchain."""
 
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load(":providers.bzl", "ApolloCliInfo")
 
 APOLLO_TOOLCHAIN_TYPE = Label("//apollo:toolchain_type")
+CODEGEN_EXEC_TOOLCHAIN_TYPE = Label("//apollo:codegen_exec_toolchain_type")
+
+# Toolchains of every rule that runs the CLI. The codegen_exec one is mandatory: it
+# is what pins those targets to the host with --@rules_apollo//apollo:codegen_exec=local.
+CODEGEN_TOOLCHAINS = [
+    config_common.toolchain_type(APOLLO_TOOLCHAIN_TYPE, mandatory = False),
+    CODEGEN_EXEC_TOOLCHAIN_TYPE,
+]
+
+# Lets codegen rules read --@rules_apollo//apollo:codegen_exec.
+CODEGEN_EXEC_ATTRS = {
+    "_codegen_exec": attr.label(default = Label("//apollo:codegen_exec")),
+}
+
+def _codegen_exec_toolchain_impl(_ctx):
+    return [platform_common.ToolchainInfo()]
+
+codegen_exec_toolchain = rule(
+    implementation = _codegen_exec_toolchain_impl,
+    doc = "Placeholder implementation of the codegen_exec toolchain type; only its constraints matter.",
+)
 
 def _apollo_toolchain_impl(ctx):
     cli = ApolloCliInfo(
@@ -73,3 +95,27 @@ def resolve_cli_for_schema(ctx, schema):
         fail("%s: the apollo toolchain is %s but schema %s was generated with %s." %
              (ctx.label, cli.version, schema.label, schema.version))
     return cli
+
+def codegen_runs_locally(ctx):
+    """Whether --@rules_apollo//apollo:codegen_exec=local is set.
+
+    Args:
+        ctx: context of a rule with CODEGEN_EXEC_ATTRS.
+
+    Returns:
+        bool
+    """
+    return ctx.attr._codegen_exec[BuildSettingInfo].value == "local"
+
+def codegen_exec_requirements(ctx):
+    """Execution requirements that keep codegen off remote execution in local mode.
+
+    Results are still uploaded to and read from the remote cache.
+
+    Args:
+        ctx: context of a rule with CODEGEN_EXEC_ATTRS.
+
+    Returns:
+        dict
+    """
+    return {"no-remote-exec": "1"} if codegen_runs_locally(ctx) else {}

@@ -1,5 +1,7 @@
 """Helpers for running apollo-ios-cli as a Bazel persistent worker."""
 
+load(":toolchain.bzl", "codegen_exec_requirements")
+
 def codegen_args(ctx, config, output_dir, mode, generate_for = [], extra = []):
     """Arguments for `apollo-ios-cli generate` in Bazel mode.
 
@@ -29,8 +31,16 @@ def codegen_args(ctx, config, output_dir, mode, generate_for = [], extra = []):
     args.set_param_file_format("multiline")
     return args
 
-def codegen_execution_requirements():
-    return {
+def codegen_execution_requirements(ctx):
+    """Worker support, plus `no-remote-exec` with --@rules_apollo//apollo:codegen_exec=local.
+
+    Args:
+        ctx: context of a rule with CODEGEN_EXEC_ATTRS.
+
+    Returns:
+        dict
+    """
+    return dict(codegen_exec_requirements(ctx), **{
         "supports-workers": "1",
         # One process per schema serves concurrent requests from a single
         # parsed schema. The CLI ignores WorkRequest.sandbox_dir, so we do not
@@ -38,7 +48,7 @@ def codegen_execution_requirements():
         # falls back to sandboxed singleplex workers.
         "supports-multiplex-workers": "1",
         "requires-worker-protocol": "proto",
-    }
+    })
 
 def worker_env(schema_label):
     """Environment that becomes part of the worker key.
