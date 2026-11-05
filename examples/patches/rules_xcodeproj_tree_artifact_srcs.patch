@@ -1,0 +1,204 @@
+rules_xcodeproj 4.1.0 reuses the SwiftCompile action's Args, which expand tree
+artifacts in srcs (rules_apollo's generated sources), in actions that do not
+have the directories as inputs. This declares them as inputs where the Args
+are reused, and lists the directories themselves in the generated filelists.
+
+diff --git a/xcodeproj/internal/compiler_args.bzl b/xcodeproj/internal/compiler_args.bzl
+--- a/xcodeproj/internal/compiler_args.bzl
++++ b/xcodeproj/internal/compiler_args.bzl
+@@ -67,9 +67,18 @@ def _collect_compiler_args(
+             target.
+     """
+     swift_args = EMPTY_LIST
++    swift_directories = EMPTY_LIST
+     for action in target.actions:
+         if action.mnemonic == "SwiftCompile":
+             swift_args = action.args
++
++            # `action.args` expand tree artifacts (e.g. generated sources), so
++            # any action that reuses them needs the directories as inputs.
++            swift_directories = tuple([
++                file
++                for file in action.inputs.to_list()
++                if file.is_directory and not file.is_source
++            ])
+             break
+ 
+     conly_args, cxx_args = _get_unprocessed_cc_compiler_opts(
+@@ -82,6 +91,7 @@ def _collect_compiler_args(
+         conly = conly_args,
+         cxx = cxx_args,
+         swift = swift_args,
++        swift_directories = swift_directories,
+     )
+ 
+ compiler_args = struct(
+diff --git a/xcodeproj/internal/pbxproj_partials.bzl b/xcodeproj/internal/pbxproj_partials.bzl
+--- a/xcodeproj/internal/pbxproj_partials.bzl
++++ b/xcodeproj/internal/pbxproj_partials.bzl
+@@ -55,6 +55,10 @@ def _generated_dirname(file):
+     if file.is_source:
+         return None
+ 
++    # A tree artifact (e.g. generated sources) is a directory itself.
++    if file.is_directory:
++        return file.path
++
+     return file.dirname
+ 
+ def _xcfilelist_always_generated_file_path(file):
+@@ -602,7 +606,11 @@ def _write_generated_directories_filelist(
+     directories_args.use_param_file("%s", use_always = True)
+ 
+     directories_args.add_all(infoplists, map_each = _dirname)
+-    directories_args.add_all(srcs, map_each = _generated_dirname)
++    directories_args.add_all(
++        srcs,
++        map_each = _generated_dirname,
++        expand_directories = False,
++    )
+ 
+     filelist = actions.declare_file(
+         "{}-generated_directories.filelist".format(generator_name),
+@@ -641,7 +649,11 @@ def _write_generated_xcfilelist(
+     # Source files are tracked as build files by Xcode, so building targets that
+     # directly use generated source files will fail the first time they are
+     # built if we don't track them
+-    args.add_all(srcs, map_each = _xcfilelist_generated_file_path)
++    args.add_all(
++        srcs,
++        map_each = _xcfilelist_generated_file_path,
++        expand_directories = False,
++    )
+ 
+     xcfilelist = actions.declare_file(
+         "{}-generated.xcfilelist".format(generator_name),
+@@ -1116,6 +1128,7 @@ def _write_target_build_settings(
+         separate_index_build_output_base,
+         swift_args,
+         swift_debug_settings_to_merge = EMPTY_DEPSET,
++        swift_directories = EMPTY_LIST,
+         team_id = None,
+         tool):
+     """Creates the `OTHER_SWIFT_FLAGS` build setting string file for a target.
+@@ -1157,6 +1170,8 @@ def _write_target_build_settings(
+             target.
+         swift_debug_settings_to_merge: A `depset` of `Files` containing
+             Swift debug settings from dependencies.
++        swift_directories: A `list` of tree artifact `File`s that
++            `swift_args` expand (e.g. generated sources).
+         team_id: The team ID to use for code signing.
+         tool: The executable that will generate the output files.
+ 
+@@ -1214,14 +1229,17 @@ def _write_target_build_settings(
+             terminate_with = "",
+         )
+ 
+-        inputs = swift_debug_settings_to_merge
++        inputs = depset(
++            swift_directories,
++            transitive = [swift_debug_settings_to_merge],
++        )
+     else:
+         debug_settings_output = None
+ 
+         # swiftDebugSettingsOutputPath
+         args.add("")
+ 
+-        inputs = []
++        inputs = swift_directories
+ 
+     # deviceFamily
+     args.add(device_family)
+diff --git a/xcodeproj/internal/processed_targets/library_targets.bzl b/xcodeproj/internal/processed_targets/library_targets.bzl
+--- a/xcodeproj/internal/processed_targets/library_targets.bzl
++++ b/xcodeproj/internal/processed_targets/library_targets.bzl
+@@ -140,6 +140,7 @@ def _process_library_target(
+             ctx.attr._separate_index_build_output_base[BuildSettingInfo].value
+         ),
+         swift_args = args.swift,
++        swift_directories = args.swift_directories,
+         tool = ctx.executable._target_build_settings_generator,
+     )
+ 
+diff --git a/xcodeproj/internal/processed_targets/mergeable_infos.bzl b/xcodeproj/internal/processed_targets/mergeable_infos.bzl
+--- a/xcodeproj/internal/processed_targets/mergeable_infos.bzl
++++ b/xcodeproj/internal/processed_targets/mergeable_infos.bzl
+@@ -147,6 +147,7 @@ def _cc_mergeable_info(*, mergeable_info):
+             product_files = (mergeable_info.product_file,),
+             srcs = mergeable_info.inputs.srcs,
+             swift_args = EMPTY_LIST,
++            swift_directories = EMPTY_LIST,
+             swift_debug_settings_to_merge = mergeable_info.swift_debug_settings,
+         ),
+     )
+@@ -247,6 +248,7 @@ def _mixed_language_mergeable_info(
+                 ],
+             ),
+             swift_args = swift.args.swift,
++            swift_directories = swift.args.swift_directories,
+             swift_debug_settings_to_merge = swift.swift_debug_settings,
+         ),
+     )
+@@ -277,6 +279,7 @@ def _swift_mergeable_info(*, dynamic_frameworks, mergeable_info, product_type):
+             product_files = (mergeable_info.product_file,),
+             srcs = mergeable_info.inputs.srcs,
+             swift_args = mergeable_info.args.swift,
++            swift_directories = mergeable_info.args.swift_directories,
+             swift_debug_settings_to_merge = mergeable_info.swift_debug_settings,
+         ),
+     )
+diff --git a/xcodeproj/internal/processed_targets/mixed_language_library_targets.bzl b/xcodeproj/internal/processed_targets/mixed_language_library_targets.bzl
+--- a/xcodeproj/internal/processed_targets/mixed_language_library_targets.bzl
++++ b/xcodeproj/internal/processed_targets/mixed_language_library_targets.bzl
+@@ -127,6 +127,7 @@ def _process_mixed_language_library_target(
+             conly = mergeable_info.conly_args,
+             cxx = mergeable_info.cxx_args,
+             swift = mergeable_info.swift_args,
++            swift_directories = mergeable_info.swift_directories,
+         )
+ 
+         indexstore_override_path = actual_package_bin_dir + "/" + label.name
+@@ -140,6 +141,7 @@ def _process_mixed_language_library_target(
+             conly = [],
+             cxx = [],
+             swift = [],
++            swift_directories = [],
+         )
+         indexstore_overrides = []
+ 
+@@ -165,6 +167,7 @@ def _process_mixed_language_library_target(
+             ctx.attr._separate_index_build_output_base[BuildSettingInfo].value
+         ),
+         swift_args = args.swift,
++        swift_directories = args.swift_directories,
+         tool = ctx.executable._target_build_settings_generator,
+     )
+ 
+diff --git a/xcodeproj/internal/processed_targets/top_level_targets.bzl b/xcodeproj/internal/processed_targets/top_level_targets.bzl
+--- a/xcodeproj/internal/processed_targets/top_level_targets.bzl
++++ b/xcodeproj/internal/processed_targets/top_level_targets.bzl
+@@ -367,6 +367,7 @@ def _process_focused_top_level_target(
+             conly = mergeable_info.conly_args,
+             cxx = mergeable_info.cxx_args,
+             swift = mergeable_info.swift_args,
++            swift_directories = mergeable_info.swift_directories,
+         )
+ 
+         if mergeable_info.previews_dynamic_frameworks:
+@@ -484,6 +485,7 @@ def _process_focused_top_level_target(
+         ),
+         swift_args = args.swift,
+         swift_debug_settings_to_merge = swift_debug_settings_to_merge,
++        swift_directories = args.swift_directories,
+         team_id = provisioning_profile_props.team_id,
+         tool = ctx.executable._target_build_settings_generator,
+     )
+@@ -794,6 +796,7 @@ def _process_unfocused_top_level_target(
+         ),
+         swift_args = args.swift,
+         swift_debug_settings_to_merge = swift_debug_settings_to_merge,
++        swift_directories = args.swift_directories,
+         tool = ctx.executable._target_build_settings_generator,
+     )
+ 

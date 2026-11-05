@@ -200,6 +200,22 @@ build --strategy=ApolloCodegen=worker,local
 matching the host and marks the CLI actions `no-remote-exec`. Their results still go to the remote cache,
 so e.g. a Linux machine can generate code that Mac remote executors compile.
 
+### Xcode projects
+
+rules_xcodeproj 4.1.0 fails to generate a project when a `swift_library` has a directory of generated
+sources in `srcs` ("Failed to expand directory"). Until it handles them, apply
+[`examples/patches/rules_xcodeproj_tree_artifact_srcs.patch`](examples/patches/rules_xcodeproj_tree_artifact_srcs.patch).
+Copy it into your repo (the patch must be in your module, next to a `BUILD.bazel`), then:
+
+```starlark
+# MODULE.bazel
+single_version_override(
+    module_name = "rules_xcodeproj",
+    patch_strip = 1,
+    patches = ["//patches:rules_xcodeproj_tree_artifact_srcs.patch"],
+)
+```
+
 ## Design and roadmap
 
 See [docs/DESIGN.md](docs/DESIGN.md). It covers the versioning trade-offs, measured invalidation behavior,

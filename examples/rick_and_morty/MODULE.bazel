@@ -11,6 +11,14 @@ bazel_dep(name = "rules_apple", version = "5.2.0", repo_name = "build_bazel_rule
 bazel_dep(name = "rules_swift", version = "4.2.0", repo_name = "build_bazel_rules_swift")
 bazel_dep(name = "rules_xcodeproj", version = "4.1.0")
 
+# rules_xcodeproj 4.1.0 fails on tree artifacts in swift_library srcs, which is
+# how rules_apollo hands generated sources to rules_swift (README, "Xcode projects").
+single_version_override(
+    module_name = "rules_xcodeproj",
+    patch_strip = 1,
+    patches = ["//patches:rules_xcodeproj_tree_artifact_srcs.patch"],
+)
+
 apollo = use_extension("@rules_apollo//apollo:extensions.bzl", "apollo")
 apollo.toolchain(version = "2.4.0")
 
