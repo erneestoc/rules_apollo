@@ -134,6 +134,38 @@ schema_filter_test = analysistest.make(
     },
 )
 
+def _outputs_test_impl(ctx):
+    env = analysistest.begin(ctx)
+    actions = analysistest.target_actions(env)
+    argv = _find_codegen_action(env).argv
+    for flag in ctx.attr.flags:
+        name, _, value = flag.partition("=")
+        if value:
+            asserts.true(env, value in _values(argv, name), "expected %s in %s" % (flag, argv))
+        else:
+            asserts.true(env, name in argv, "expected %s in %s" % (name, argv))
+    for flag in ctx.attr.absent_flags:
+        asserts.false(env, flag in argv, "unexpected %s" % flag)
+
+    merges = [a for a in actions if a.mnemonic == "ApolloMergeSources"]
+    asserts.equals(env, 1 if ctx.attr.merged else 0, len(merges))
+    if merges:
+        asserts.equals(env, ctx.attr.excluded, merges[0].argv[len(merges[0].argv) - len(ctx.attr.excluded):])
+    asserts.false(env, [a for a in actions if a.mnemonic == "ApolloFilterSources"] and ctx.attr.merged, "merging also filtered")
+    asserts.equals(env, sorted(ctx.attr.outputs), _output_basenames(env))
+    return analysistest.end(env)
+
+outputs_test = analysistest.make(
+    _outputs_test_impl,
+    attrs = {
+        "flags": attr.string_list(doc = "`--flag` or `--flag=value` expected in the codegen argv."),
+        "absent_flags": attr.string_list(),
+        "merged": attr.bool(),
+        "excluded": attr.string_list(),
+        "outputs": attr.string_list(),
+    },
+)
+
 def _failure_test_impl(ctx):
     env = analysistest.begin(ctx)
     asserts.expect_failure(env, ctx.attr.expected)

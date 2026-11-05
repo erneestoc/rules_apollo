@@ -24,7 +24,8 @@ def _apollo_schema_impl(ctx):
         config = codegen_config(base_config, schema_files, operation_files),
         output_dir = schema_types,
         mode = "schema_types",
-        extra = ["--bazel-keep-schema-configuration"],
+        extra = ["--bazel-keep-schema-configuration"] +
+                (["--bazel-optimize-schema-metadata"] if ctx.attr.optimize_schema_metadata else []),
     )
     ctx.actions.run(
         executable = cli.cli,
@@ -41,7 +42,9 @@ def _apollo_schema_impl(ctx):
     replaced = ["CustomScalars/%s.swift" % name for name in ctx.attr.custom_scalars]
     if ctx.file.schema_configuration:
         replaced.append("SchemaConfiguration.swift")
-    outputs = [generated_swift_sources(ctx, schema_types, exclude = replaced)]
+    outputs = [generated_swift_sources(ctx, schema_types, exclude = replaced, merge = ctx.attr.merge_sources)]
+
+    # A SchemaConfiguration.swift of the user's stays its own source, also when merging.
     if ctx.file.schema_configuration:
         outputs.append(ctx.file.schema_configuration)
 
@@ -89,8 +92,9 @@ apollo_schema = rule(
     implementation = _apollo_schema_impl,
     doc = """Generates the schema-types Swift module for a GraphQL schema.
 
-The default output is a directory of generated Swift files (plus
-`schema_configuration`, if set) meant for a `swift_library` whose `module_name` equals `schema_namespace`. Operation modules are
+The default output is a directory of generated Swift files (or, with `merge_sources`,
+one .swift file) plus `schema_configuration`, if set, meant for a `swift_library` whose
+`module_name` equals `schema_namespace`. Operation modules are
 generated separately by `apollo_operations` targets that point at this one.
 
 `srcs` must contain every .graphql file of the app: Apollo generates only the schema
@@ -125,6 +129,15 @@ byte-identical, so nothing downstream recompiles.""",
         "custom_scalars": attr.string_list(
             doc = "Custom scalars you implement yourself (in the Swift module's other sources). " +
                   "The CLI's default `typealias <Name> = String` for each is left out.",
+        ),
+        "optimize_schema_metadata": attr.bool(
+            doc = "Adds a dictionary lookup to `SchemaMetadata.objectType(forTypename:)`, used " +
+                  "instead of the generated `switch` when `fastObjectTypeLookup` is set.",
+        ),
+        "merge_sources": attr.bool(
+            doc = "Concatenate the generated files into one .swift file instead of returning a " +
+                  "directory, for rules_swift versions that do not compile directories in `srcs`. " +
+                  "`schema_configuration` stays a separate file.",
         ),
         "operation_manifest_version": attr.string(
             values = ["", "persistedQueries", "legacy"],

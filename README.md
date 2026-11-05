@@ -32,7 +32,9 @@ covers Apple Silicon and Linux remote execution. Intel Macs need a CLI built fro
 registered with `apollo_toolchain`.
 
 The generated code is a directory of Swift files per target, which `swift_library` compiles file by
-file. That needs rules_swift 4.2.0 or later, which rules_apollo depends on.
+file. That needs rules_swift 4.2.0 or later, which rules_apollo depends on. With an older rules_swift,
+set `merge_sources = True` on the schema and operations targets: each then generates one concatenated
+`.swift` file instead (a `schema_configuration` of yours stays a separate file).
 
 Three complete examples:
 - [`examples/rick_and_morty`](examples/rick_and_morty): a modular SwiftUI app for the public Rick and Morty
@@ -100,6 +102,8 @@ fragment from a target not listed in `deps` fails codegen with `Unknown fragment
 | `apollo_operations.access_modifier` | `output.operations.absolute.accessModifier` |
 | `schema_configuration` | Your `SchemaConfiguration.swift`, replacing the generated default |
 | `custom_scalars` | Custom scalars you implement yourself. The CLI's default `typealias <Name> = String` is dropped for them |
+| `optimize_schema_metadata` | Adds a dictionary lookup to `SchemaMetadata.objectType(forTypename:)`, enabled at run time with `fastObjectTypeLookup`. Only changes output where the CLI still generates a `switch` (2.4.0 already uses a dictionary) |
+| `merge_sources` | One concatenated `.swift` file instead of a directory, for rules_swift older than 4.2.0 |
 
 `input` and `output` are owned by the rules.
 

@@ -49,7 +49,10 @@ apollo.runtime(name = "next", version = "2.4.0", module_suffix = "_v2")
 ```
 
 For each runtime, rules_apollo downloads the CLI and builds Apollo iOS from the upstream release. You
-don't write BUILD files for Apollo iOS.
+don't write BUILD files for Apollo iOS. To use your own anyway (e.g. for more Apollo iOS libraries),
+pass `build_file = "//third_party:apollo_ios.BUILD"` to `apollo.runtime()`. It must declare
+`ApolloAPI`, `Apollo` and `ApolloTestSupport`; `{version}`, `{suffix}` and `{copts}` in it are
+replaced with the runtime's version, module suffix and Swift flags.
 
 **Generated code:** `apollo_swift_schema`, `apollo_swift_operations` and `apollo_swift_test_mocks`
 create one variant per runtime (`<name>` on the home runtime, `<name>_v2` elsewhere, each with its

@@ -31,6 +31,9 @@ def _apollo_operations_impl(ctx):
 
     transitive_srcs = depset(srcs, transitive = [d[ApolloOperationsInfo].transitive_srcs for d in ctx.attr.deps])
 
+    # Operations compiled into the schema's own module must not import it.
+    in_schema_module = module_name == schema.namespace
+
     out = ctx.actions.declare_directory(ctx.label.name + "_operations")
     args = codegen_args(
         ctx,
@@ -43,6 +46,7 @@ def _apollo_operations_impl(ctx):
         output_dir = out,
         mode = "operations",
         generate_for = srcs,
+        extra = ["--bazel-strip-import", schema.namespace] if in_schema_module else [],
     )
     ctx.actions.run(
         executable = cli.cli,
@@ -56,19 +60,26 @@ def _apollo_operations_impl(ctx):
         toolchain = None if schema.cli_override else APOLLO_TOOLCHAIN_TYPE,
     )
 
-    outputs = [generated_swift_sources(ctx, out)]
-    if ctx.attr.deps:
+    outputs = [generated_swift_sources(ctx, out, merge = ctx.attr.merge_sources)]
+
+    # Deps compiled into the schema module (or into this module) are not re-exported:
+    # every generated file imports the schema module already, and a module cannot
+    # import itself.
+    reexported = sorted({
+        d[ApolloOperationsInfo].module_name: True
+        for d in ctx.attr.deps
+        if d[ApolloOperationsInfo].module_name not in (schema.namespace, module_name)
+    }.keys())
+    if reexported:
         imports = ctx.actions.declare_file(ctx.label.name + "_ApolloImports.swift")
         ctx.actions.write(imports, _IMPORTS.format(
             label = ctx.label,
-            imports = "\n".join(sorted({
-                "@_exported import " + d[ApolloOperationsInfo].module_name: True
-                for d in ctx.attr.deps
-            }.keys())),
+            imports = "\n".join(["@_exported import " + m for m in reexported]),
         ))
         outputs.append(imports)
-    else:
-        # Without `deps` there is no imports file, and `srcs` can generate nothing (e.g. none).
+    elif not ctx.attr.merge_sources:
+        # Without an imports file the tree is the only source, and `srcs` can generate
+        # nothing (e.g. none). A merged file is never missing, even when empty.
         outputs.append(module_placeholder(ctx))
 
     return [
@@ -91,6 +102,10 @@ never the whole app. Code is generated only for `srcs` (`--bazel-generate-for`);
 fragments from `deps` are imported from their modules. The generated code imports the schema module
 (`schema_namespace`).
 
+Setting `module_name` to the schema's `schema_namespace` compiles the operations into
+the schema module itself (list this target in that `swift_library`'s `srcs`): the
+generated `import <schema_namespace>` is then stripped.
+
 Runs on the same persistent worker as its schema, which keeps the parsed schema in
 memory, so each target only pays for compiling its own operations.""",
     attrs = {
@@ -109,6 +124,10 @@ memory, so each target only pays for compiling its own operations.""",
         ),
         "module_name": attr.string(
             doc = "Swift module the generated code is compiled into. Defaults to the target name.",
+        ),
+        "merge_sources": attr.bool(
+            doc = "Concatenate the generated files into one .swift file instead of returning a " +
+                  "directory, for rules_swift versions that do not compile directories in `srcs`.",
         ),
         "access_modifier": attr.string(
             default = "public",

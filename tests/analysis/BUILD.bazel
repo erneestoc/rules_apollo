@@ -1,5 +1,5 @@
 load("//apollo:defs.bzl", "apollo_operations", "apollo_schema", "apollo_test_mocks", "apollo_toolchain")
-load(":analysis_tests.bzl", "failure_test", "mocks_action_test", "operations_action_test", "schema_action_test", "schema_filter_test")
+load(":analysis_tests.bzl", "failure_test", "mocks_action_test", "operations_action_test", "outputs_test", "schema_action_test", "schema_filter_test")
 
 apollo_schema(
     name = "schema",
@@ -30,6 +30,83 @@ schema_filter_test(
     ],
     extra_outputs = ["SchemaConfiguration.swift"],
     target_under_test = ":schema_with_replaced_files",
+)
+
+# merge_sources: one action filters and concatenates; the user's SchemaConfiguration.swift
+# stays a separate source.
+apollo_schema(
+    name = "merged_schema",
+    srcs = ["//tests/analysis/a:A.graphql"],
+    custom_scalars = ["Date"],
+    merge_sources = True,
+    optimize_schema_metadata = True,
+    schema = ["schema.graphqls"],
+    schema_configuration = "SchemaConfiguration.swift",
+    schema_namespace = "TestAPI",
+    tags = ["manual"],
+)
+
+outputs_test(
+    name = "merged_schema_test",
+    excluded = [
+        "CustomScalars/Date.swift",
+        "SchemaConfiguration.swift",
+    ],
+    flags = [
+        "--bazel-keep-schema-configuration",
+        "--bazel-optimize-schema-metadata",
+    ],
+    merged = True,
+    outputs = [
+        "SchemaConfiguration.swift",
+        "merged_schema_schema_types.swift",
+    ],
+    target_under_test = ":merged_schema",
+)
+
+outputs_test(
+    name = "unoptimized_schema_test",
+    absent_flags = ["--bazel-optimize-schema-metadata"],
+    outputs = ["schema_schema_types"],
+    target_under_test = ":schema",
+)
+
+# Operations compiled into the schema module: no `import TestAPI`, and the merged file
+# needs no placeholder.
+apollo_operations(
+    name = "ops_in_schema_module",
+    srcs = ["Second.graphql"],
+    merge_sources = True,
+    module_name = "TestAPI",
+    schema = ":schema",
+    tags = ["manual"],
+)
+
+outputs_test(
+    name = "ops_in_schema_module_test",
+    flags = ["--bazel-strip-import=TestAPI"],
+    merged = True,
+    outputs = ["ops_in_schema_module_operations.swift"],
+    target_under_test = ":ops_in_schema_module",
+)
+
+# A dep in the schema module is not re-exported, so there is no imports file.
+apollo_operations(
+    name = "ops_on_schema_module_ops",
+    srcs = ["//tests/analysis/a:A.graphql"],
+    schema = ":schema",
+    tags = ["manual"],
+    deps = [":ops_in_schema_module"],
+)
+
+outputs_test(
+    name = "schema_reexport_skipped_test",
+    absent_flags = ["--bazel-strip-import"],
+    outputs = [
+        "ops_on_schema_module_ops_Module.swift",
+        "ops_on_schema_module_ops_operations",
+    ],
+    target_under_test = ":ops_on_schema_module_ops",
 )
 
 # A stand-in CLI that claims to be an old release, for version gating.

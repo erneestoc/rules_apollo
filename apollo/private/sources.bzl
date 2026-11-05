@@ -4,19 +4,25 @@ rules_swift 4.2.0 compiles a directory (tree artifact) in `srcs` file by file:
 each generated file gets its own object, as if it were listed individually. So
 the CLI's output directory is used as is. Files that the user replaces are left
 out by copying the directory without them.
+
+With `merge`, the directory is instead concatenated into one `.swift` file, for
+rules_swift versions that do not accept a directory in `srcs`.
 """
 
-def generated_swift_sources(ctx, tree, exclude = []):
+def generated_swift_sources(ctx, tree, exclude = [], merge = False):
     """Returns the generated Swift sources in `tree` for a `swift_library`.
 
     Args:
         ctx: rule context.
         tree: tree artifact of generated .swift files.
         exclude: paths relative to `tree` to leave out (e.g. files the user replaces).
+        merge: concatenate the files into one `.swift` file.
 
     Returns:
-        File: `tree`, or a copy of it without `exclude`.
+        File: `tree`, a copy of it without `exclude`, or (with `merge`) one .swift file.
     """
+    if merge:
+        return _merge(ctx, tree, exclude)
     if not exclude:
         return tree
 
@@ -29,16 +35,54 @@ def generated_swift_sources(ctx, tree, exclude = []):
         inputs = [tree],
         outputs = [filtered],
         arguments = [args],
+        # Bazel leaves the tree's directories read-only, and cp keeps their modes.
         command = """\
 set -eu
 src="$1"; dst="$2"; shift 2
 cp -RL "$src/." "$dst"
+chmod -R u+w "$dst"
 for path in "$@"; do rm -f "$dst/$path"; done
 """,
         mnemonic = "ApolloFilterSources",
         progress_message = "Filtering generated Swift for %{label}",
     )
     return filtered
+
+def _merge(ctx, tree, exclude):
+    """Concatenates the .swift files of `tree`, minus `exclude`, in one action.
+
+    Files are visited in byte order of their path relative to `tree` (`LC_ALL=C`),
+    so the output, and the cache keys of everything compiled from it, do not depend
+    on the file system's listing order or on the locale of the machine.
+    """
+    merged = ctx.actions.declare_file(tree.basename + ".swift")
+    args = ctx.actions.args()
+    args.add(tree.path)
+    args.add(merged.path)
+    args.add_all(exclude)
+    ctx.actions.run_shell(
+        inputs = [tree],
+        outputs = [merged],
+        arguments = [args],
+        command = """\
+set -euo pipefail
+src="$1"; out="$2"; shift 2
+skip=$'\\n'
+for path in "$@"; do skip+="$path"$'\\n'; done
+: > "$out"
+find -L "$src" -type f -name '*.swift' -print0 | LC_ALL=C sort -z |
+while IFS= read -r -d '' file; do
+  path="${file#"$src"/}"
+  case "$skip" in *$'\\n'"$path"$'\\n'*) continue ;; esac
+  printf '// MARK: - %s\\n\\n' "$path" >> "$out"
+  cat "$file" >> "$out"
+  printf '\\n' >> "$out"
+done
+""",
+        mnemonic = "ApolloMergeSources",
+        progress_message = "Merging generated Swift for %{label}",
+    )
+    return merged
 
 def module_placeholder(ctx):
     """Declares a Swift file with no code, so a module whose tree is empty compiles.

@@ -139,6 +139,8 @@ def apollo_swift_schema(
         custom_scalars = [],
         schema_configuration = None,
         operation_manifest_version = None,
+        optimize_schema_metadata = False,
+        merge_sources = False,
         cli = None,
         runtime = None,
         runtimes = None,
@@ -164,6 +166,8 @@ def apollo_swift_schema(
         custom_scalars: custom scalars you implement in `swift_srcs` (drops the generated String typealias).
         schema_configuration: your SchemaConfiguration.swift.
         operation_manifest_version: "persistedQueries" or "legacy" to emit a manifest.
+        optimize_schema_metadata: add a dictionary lookup to SchemaMetadata (see apollo_schema).
+        merge_sources: compile the generated code from one concatenated .swift file.
         cli: per-schema CLI override, e.g. "@apollo_next//:cli". Not used with runtimes.
         runtime: home runtime (plain names). Defaults to the runtime without a module suffix.
         runtimes: runtimes to create variants for. Defaults to every declared runtime.
@@ -186,6 +190,8 @@ def apollo_swift_schema(
             custom_scalars = custom_scalars,
             schema_configuration = schema_configuration,
             operation_manifest_version = operation_manifest_version,
+            optimize_schema_metadata = optimize_schema_metadata,
+            merge_sources = merge_sources,
             cli = rt.cli if rt else cli,
             visibility = visibility,
             tags = tags,
@@ -210,6 +216,7 @@ def apollo_swift_operations(
         deps = [],
         module_name = None,
         access_modifier = "public",
+        merge_sources = False,
         runtime = None,
         runtimes = None,
         swift_srcs = [],
@@ -231,6 +238,7 @@ def apollo_swift_operations(
         deps: other apollo_swift_operations whose fragments these operations use.
         module_name: Swift module name.
         access_modifier: "public" or "internal".
+        merge_sources: compile the generated code from one concatenated .swift file.
         runtime: home runtime (plain names). Defaults to the runtime without a module suffix.
         runtimes: runtimes to create variants for. Defaults to every declared runtime.
         swift_srcs: extra Swift sources for the module.
@@ -249,6 +257,7 @@ def apollo_swift_operations(
             deps = [_on(d, rt, codegen = True) for d in deps],
             module_name = module + suffix,
             access_modifier = access_modifier,
+            merge_sources = merge_sources,
             visibility = visibility,
             tags = tags,
         )

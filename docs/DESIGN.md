@@ -31,6 +31,13 @@
   that can generate nothing (operations, mocks) also get an empty `<name>_Module.swift`, since swiftc
   rejects a module without input files.
 
+  `merge_sources` concatenates the directory into one `.swift` file instead, minus the replaced files,
+  in a single action. Files go in byte order of their relative path (`LC_ALL=C sort -z`), so the
+  output, and the cache keys downstream, depend neither on directory listing order nor on the locale.
+  That file is never missing, so it needs no `<name>_Module.swift`. An operations target whose
+  `module_name` is the schema's namespace is compiled into the schema module: its CLI action gets
+  `--bazel-strip-import <namespace>`, and dependents don't re-export that module.
+
 ### Persistent workers
 
 The fork's CLI implements the worker protocol (`--persistent_worker`), including multiplex. One worker

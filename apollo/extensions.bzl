@@ -54,6 +54,11 @@ _runtime = tag_class(
                   "be linked next to another runtime. Leave empty for exactly one runtime.",
         ),
         "sha256": attr.string(doc = "sha256 of the apollo-ios source archive, for versions not in the table."),
+        "build_file": attr.label(
+            doc = "BUILD file for the apollo-ios sources, replacing the one rules_apollo writes. It " +
+                  "must declare `ApolloAPI`, `Apollo` and `ApolloTestSupport`; `{version}`, " +
+                  "`{suffix}` and `{copts}` in it are replaced as in the built-in one.",
+        ),
     },
 )
 
@@ -136,6 +141,7 @@ def _apollo_impl(mctx):
             version = tag.version,
             suffix = tag.module_suffix,
             sha256 = sha256,
+            build_file = tag.build_file,
         )
 
     # Always created, so the macros can load it; empty when no runtimes are declared.

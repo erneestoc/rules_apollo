@@ -88,11 +88,11 @@ def _apollo_runtime_repo_impl(rctx):
     # Apollo iOS 1.x is Swift 5 language mode; 2.x is Swift 6.
     swift_version = "5" if version.startswith("1.") else "6"
     copts = ["-swift-version", swift_version] + runtime_aliases(rctx.attr.suffix)
-    rctx.file("BUILD.bazel", _RUNTIME_BUILD.format(
-        version = version,
-        suffix = rctx.attr.suffix,
-        copts = repr(copts),
-    ))
+    values = {"version": version, "suffix": rctx.attr.suffix, "copts": repr(copts)}
+    if rctx.attr.build_file:
+        rctx.template("BUILD.bazel", rctx.attr.build_file, {"{%s}" % k: v for k, v in values.items()})
+    else:
+        rctx.file("BUILD.bazel", _RUNTIME_BUILD.format(**values))
 
 apollo_runtime_repo = repository_rule(
     implementation = _apollo_runtime_repo_impl,
@@ -102,6 +102,10 @@ apollo_runtime_repo = repository_rule(
         "suffix": attr.string(),
         "sha256": attr.string(mandatory = True),
         "url_templates": attr.string_list(default = [SOURCE_URL_TEMPLATE]),
+        "build_file": attr.label(
+            allow_single_file = True,
+            doc = "Replaces the generated BUILD file; `{version}`, `{suffix}` and `{copts}` are substituted.",
+        ),
     },
 )
 
